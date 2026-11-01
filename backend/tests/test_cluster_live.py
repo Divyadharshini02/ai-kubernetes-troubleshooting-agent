@@ -70,6 +70,39 @@ def test_pods_match_kubectl(health):
     assert {(p["namespace"], p["name"]): p["phase"] for p in health["pods"]} == expected
 
 
+def test_untrusted_server_certificate_is_a_safe_connection_error(tmp_path, monkeypatch):
+    # The real API server with no CA configured, so certificate verification really fails.
+    server = subprocess.run(
+        ["kubectl", "config", "view", "--minify", "-o", "jsonpath={.clusters[0].cluster.server}"],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=True,
+    ).stdout.strip()
+    assert server.startswith("https://")
+    kubeconfig = tmp_path / "kubeconfig"
+    kubeconfig.write_text(
+        json.dumps(
+            {
+                "apiVersion": "v1",
+                "kind": "Config",
+                "current-context": "untrusted",
+                "clusters": [{"name": "c", "cluster": {"server": server}}],
+                "users": [{"name": "u", "user": {"token": "not-a-real-token"}}],
+                "contexts": [{"name": "untrusted", "context": {"cluster": "c", "user": "u"}}],
+            }
+        )
+    )
+    monkeypatch.setenv("KUBECONFIG", str(kubeconfig))
+
+    response = client.get("/api/cluster/health")
+
+    assert response.status_code == 503
+    assert response.json()["detail"]["code"] == "cluster_unreachable"
+    assert "HTTP 0" not in response.text
+    assert "certificate" not in response.text.lower()
+
+
 def test_sample_workload_is_reported_healthy(health):
     sample_pods = [p for p in health["pods"] if p["namespace"] == "sample-app"]
 

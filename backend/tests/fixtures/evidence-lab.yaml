@@ -1,0 +1,150 @@
+# Deliberately broken workloads for the cluster tests only.
+# lab_harness.py applies this to a throwaway namespace and removes it afterwards.
+# Every resource must live in this namespace, so deleting the namespace removes it.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: evidence-lab
+  labels:
+    app.kubernetes.io/managed-by: evidence-lab-tests
+---
+# CrashLoopBackOff, with a literal value and a credential-like log line that must not leak.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: crash-demo
+  namespace: evidence-lab
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: crash-demo
+  template:
+    metadata:
+      labels:
+        app: crash-demo
+    spec:
+      terminationGracePeriodSeconds: 1
+      containers:
+        - name: app
+          image: nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10
+          command: ["sh", "-c", "echo 'startup failed password=lab-log-secret'; exit 3"]
+          env:
+            - name: LITERAL_SETTING
+              value: lab-literal-secret
+            - name: FROM_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: not-created
+                  key: password
+                  optional: true
+          resources:
+            limits:
+              cpu: 50m
+              memory: 32Mi
+---
+# ImagePullBackOff. The .invalid domain can never resolve, so no registry is contacted.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: image-demo
+  namespace: evidence-lab
+spec:
+  containers:
+    - name: app
+      image: registry.invalid/demo/app:missing
+      resources:
+        limits:
+          cpu: 50m
+          memory: 32Mi
+---
+# Pending: no node has this label.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pending-selector-demo
+  namespace: evidence-lab
+spec:
+  nodeSelector:
+    evidence-lab/no-such-node: "true"
+  containers:
+    - name: app
+      image: nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10
+---
+# Pending: the claim names a StorageClass that does not exist.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pending-claim
+  namespace: evidence-lab
+spec:
+  storageClassName: no-such-class
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Mi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pending-claim-demo
+  namespace: evidence-lab
+spec:
+  containers:
+    - name: app
+      image: nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10
+      volumeMounts:
+        - name: data
+          mountPath: /data
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: pending-claim
+---
+# Service whose selector matches no pods.
+apiVersion: v1
+kind: Service
+metadata:
+  name: mismatch-demo
+  namespace: evidence-lab
+spec:
+  selector:
+    app: no-such-app
+  ports:
+    - port: 80
+      targetPort: 80
+---
+# Readiness probe failure: the container keeps running but never becomes ready.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: readiness-demo
+  namespace: evidence-lab
+spec:
+  containers:
+    - name: app
+      image: nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10
+      readinessProbe:
+        httpGet:
+          path: /no-such-path
+          port: 80
+        periodSeconds: 2
+        failureThreshold: 1
+---
+# Liveness probe failure: the kubelet restarts the container.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: liveness-demo
+  namespace: evidence-lab
+spec:
+  terminationGracePeriodSeconds: 1
+  containers:
+    - name: app
+      image: nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10
+      livenessProbe:
+        httpGet:
+          path: /no-such-path
+          port: 80
+        periodSeconds: 2
+        failureThreshold: 1

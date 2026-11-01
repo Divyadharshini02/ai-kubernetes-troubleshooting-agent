@@ -6,7 +6,7 @@ from app.models.cluster import ClusterHealth
 router = APIRouter(prefix="/cluster", tags=["cluster"])
 
 # The API answered with an error: 502. No usable connection was made: 503.
-_STATUS_BY_CODE = {
+STATUS_BY_CODE = {
     "kubeconfig_unavailable": 503,
     "cluster_unreachable": 503,
     "cluster_access_denied": 502,
@@ -24,6 +24,6 @@ def get_cluster_health() -> ClusterHealth:
         return read_cluster_health()
     except ClusterAccessError as exc:
         raise HTTPException(
-            status_code=_STATUS_BY_CODE[exc.code],
+            status_code=STATUS_BY_CODE[exc.code],
             detail={"code": exc.code, "message": exc.message},
         ) from exc

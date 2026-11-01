@@ -30,7 +30,16 @@ class ClusterAccessError(Exception):
         self.message = message
 
 
-def _load_configuration() -> tuple[client.Configuration, str]:
+def is_tls_failure(exc: ApiException) -> bool:
+    """Tell a TLS failure apart from the client's other status 0 errors.
+
+    The client reports TLS failures as status 0 with the error type first in the
+    reason. It also uses status 0 for responses with an unsupported content type.
+    """
+    return not exc.status and str(exc.reason).startswith("SSLError")
+
+
+def load_configuration() -> tuple[client.Configuration, str]:
     # The client reads KUBECONFIG once at import, so read it per call instead.
     config_file = os.environ.get("KUBECONFIG")
     configuration = client.Configuration()
@@ -75,7 +84,7 @@ def _pod_summary(pod: client.V1Pod) -> PodSummary:
 
 def read_cluster_health() -> ClusterHealth:
     """Read real node and pod information. Raises ClusterAccessError on any failure."""
-    configuration, context = _load_configuration()
+    configuration, context = load_configuration()
     try:
         with client.ApiClient(configuration) as api_client:
             version = client.VersionApi(api_client).get_code(
@@ -96,6 +105,18 @@ def read_cluster_health() -> ClusterHealth:
                 pods=[_pod_summary(pod) for pod in pods.items],
             )
     except ApiException as exc:
+        if is_tls_failure(exc):
+            logger.warning("Could not establish a secure connection to the Kubernetes API")
+            raise ClusterAccessError(
+                "cluster_unreachable",
+                "A secure connection to the Kubernetes API could not be established.",
+            ) from exc
+        if not exc.status:
+            logger.warning("Kubernetes API response could not be processed")
+            raise ClusterAccessError(
+                "cluster_api_error",
+                "The Kubernetes API returned an unexpected response.",
+            ) from exc
         logger.warning("Kubernetes API returned status %s", exc.status)
         if exc.status in (401, 403):
             raise ClusterAccessError(

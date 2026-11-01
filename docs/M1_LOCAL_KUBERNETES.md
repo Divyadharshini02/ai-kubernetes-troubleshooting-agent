@@ -42,7 +42,7 @@ It reports what the Kubernetes API returned: server version, nodes and pods. It 
 |---|---|---|
 | Connected | 200 | Not applicable |
 | Kubeconfig missing or invalid | 503 | `kubeconfig_unavailable` |
-| API server unreachable or timed out | 503 | `cluster_unreachable` |
+| API server unreachable, timed out, or the TLS connection failed | 503 | `cluster_unreachable` |
 | API rejected the credentials or permissions | 502 | `cluster_access_denied` |
 | API returned an error or an unexpected response | 502 | `cluster_api_error` |
 
