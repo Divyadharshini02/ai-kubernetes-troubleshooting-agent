@@ -4,6 +4,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 from app.models.evidence import CollectionStatus, EvidenceBundle, Temporality
+from app.models.explanation import LlmReport
 
 Scenario = Literal[
     "crash_loop_backoff",
@@ -120,3 +121,5 @@ class DiagnosticReport(BaseModel):
     rule_results: list[RuleResult]
     # Present only when requested, so references can be followed to the evidence itself.
     evidence: EvidenceBundle | None = None
+    # Present only when an explanation was requested. Everything above is deterministic.
+    llm: LlmReport | None = None

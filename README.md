@@ -10,11 +10,12 @@ Evidence-based Kubernetes incident investigation and recovery assistant. The ful
 | [M1: Local Kubernetes connectivity](docs/M1_LOCAL_KUBERNETES.md) | Done |
 | [M2: Evidence collection](docs/M2_EVIDENCE_COLLECTION.md) | Done |
 | [M3: Deterministic diagnostics](docs/M3_DIAGNOSTICS.md) | Done |
-| M4 to M10 | Not started |
+| [M4: Optional LLM integration](docs/M4_LLM_INTEGRATION.md) | Accepted with documented limitations, not yet run against the real provider |
+| M5 to M10 | Not started |
 
-**What works today:** a FastAPI backend that reads real resources from a local kind cluster, collects read-only evidence for a namespace, and diagnoses five failure scenarios using deterministic rules. A React page shows backend health.
+**What works today:** a FastAPI backend that reads real resources from a local kind cluster, collects read-only evidence for a namespace, and diagnoses five failure scenarios using deterministic rules. An optional LLM can explain those diagnoses in clearer language, and the project works fully without it. A React page shows backend health.
 
-**What does not exist yet:** there is no AI, no investigation screen and no saved history. AI, the dashboard, Jenkins and monitoring are planned for later milestones. The application suggests fixes but never applies them.
+**What does not exist yet:** there is no investigation screen and no saved history. The dashboard, Jenkins and monitoring are planned for later milestones. The application suggests fixes but never applies them.
 
 ## Prerequisites
 
@@ -46,7 +47,10 @@ python -m venv .venv
 | <http://127.0.0.1:8000/api/cluster/health> | Live nodes and pods from the current kubeconfig context |
 | <http://127.0.0.1:8000/api/namespaces/sample-app/evidence> | Live evidence for one namespace |
 | <http://127.0.0.1:8000/api/namespaces/sample-app/diagnosis> | Deterministic diagnosis of one namespace |
+| <http://127.0.0.1:8000/api/namespaces/sample-app/diagnosis?explain=true> | The same, with an optional LLM explanation |
 | <http://127.0.0.1:8000/docs> | Interactive API docs |
+
+No API key is needed. To turn on the optional LLM explanations, follow [docs/M4_LLM_INTEGRATION.md](docs/M4_LLM_INTEGRATION.md#set-up).
 
 ## Run the frontend
 

@@ -4,7 +4,7 @@
 
 **Acceptance criterion:** diagnostic rules work, healthy workloads are recognized, and ambiguous conditions are handled honestly.
 
-**Status:** completed and approved. There is no LLM in this milestone. The same evidence always produces the same diagnoses. Fixes are suggested and never applied.
+**Status:** completed and approved. There is no LLM in this milestone. The same evidence always produces the same diagnoses. Fixes are suggested and never applied. [Milestone 4](M4_LLM_INTEGRATION.md) adds optional explanations without changing any of this.
 
 ## Architecture
 

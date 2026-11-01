@@ -7,6 +7,22 @@ from kubernetes import client
 from app.collectors.base import CollectorContext
 from stub_kube import NAMESPACE, SECRET_VALUE, StubKube
 
+TEST_API_KEY = "test-only-openrouter-key-value"
+
+
+@pytest.fixture(autouse=True)
+def no_real_llm_calls(monkeypatch):
+    """Keep every test away from the real provider, even with a developer's .env present.
+
+    Environment variables take priority over .env, and this address accepts no connections.
+    """
+    monkeypatch.setenv("LLM_ENABLED", "false")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "")
+    monkeypatch.setenv("OPENROUTER_MODEL", "")
+    monkeypatch.setenv("OPENROUTER_BASE_URL", "http://127.0.0.1:9/api/v1")
+    monkeypatch.setenv("LLM_TIMEOUT_SECONDS", "5")
+    monkeypatch.setenv("LLM_MAX_RETRIES", "1")
+
 
 @pytest.fixture
 def kube():
@@ -48,3 +64,15 @@ def stub_kubeconfig(tmp_path, monkeypatch):
         monkeypatch.setenv("KUBECONFIG", str(path))
 
     return _use
+
+
+@pytest.fixture
+def llm(monkeypatch):
+    """A local stand-in for OpenRouter, with the LLM enabled and pointed at it."""
+    stub = StubKube()
+    monkeypatch.setenv("LLM_ENABLED", "true")
+    monkeypatch.setenv("OPENROUTER_API_KEY", TEST_API_KEY)
+    monkeypatch.setenv("OPENROUTER_MODEL", "test/model:free")
+    monkeypatch.setenv("OPENROUTER_BASE_URL", f"{stub.url}/api/v1")
+    yield stub
+    stub.stop()

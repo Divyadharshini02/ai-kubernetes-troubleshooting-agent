@@ -20,6 +20,9 @@ class StubKube:
         # An optional third item overrides the content type.
         self.routes = {}
         self.requests = []
+        # Request bodies and headers, in order, for tests that inspect what was sent.
+        self.bodies = []
+        self.headers = []
         stub = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -28,6 +31,9 @@ class StubKube:
                 path = parsed.path.rstrip("/")
                 query = parse_qs(parsed.query)
                 stub.requests.append((self.command, path, query))
+                length = int(self.headers.get("Content-Length") or 0)
+                stub.bodies.append(self.rfile.read(length) if length else b"")
+                stub.headers.append(dict(self.headers))
                 route = stub.routes.get(path, (404, {"kind": "Status", "code": 404}))
                 status, body, *content_type_override = route(query) if callable(route) else route
                 if isinstance(body, bytes):
@@ -48,6 +54,8 @@ class StubKube:
                 pass
 
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        # A client that gave up on a slow reply is expected, not an error to print.
+        self.server.handle_error = lambda request, client_address: None
         self.url = f"http://127.0.0.1:{self.server.server_port}"
         # A short poll interval keeps server shutdown, and so each test, fast.
         self.thread = threading.Thread(
