@@ -1,6 +1,6 @@
 # Development Environment
 
-Recorded during Milestone 0 on 2026-11-01. These are measurements from one machine, so re-check them if the machine or Docker Desktop changes.
+Verified on 2026-11-01 on this project's development machine. These are measurements from one machine, so re-check them if the machine, WSL or Docker Desktop changes.
 
 ## Machine
 
@@ -8,59 +8,94 @@ Recorded during Milestone 0 on 2026-11-01. These are measurements from one machi
 |---|---|
 | OS | Windows 10 Pro, build 19045 |
 | CPU | Intel i5-6300U: 2 cores, 4 threads |
-| RAM | 15.9 GB total, 6.7 GB free when measured |
-| Disk C: | 61.3 GB free of 237.8 GB |
+| RAM | 15.9 GB total |
+| Disk C: | 237.8 GB total |
 
 ## Tools
 
 | Tool | Version | Notes |
 |---|---|---|
-| Python | 3.13.3 | |
-| Node.js / npm | 22.15.0 / 11.3.0 | Meets the `create-vite` requirement of 22.12 or newer |
+| Python | 3.13.3 | Project packages are installed only in `backend/.venv` |
+| Node.js / npm | 22.15.0 / 11.3.0 | |
 | Git | 2.54.0 | |
-| Docker | 29.7.2 | Docker Desktop, WSL2 engine, 4 CPUs and 7.7 GB available to containers |
+| Docker | 29.7.2 | Docker Desktop, WSL2 engine, 4 CPUs and 7.7 GiB available to containers |
+| WSL | 2.4.13 | Kernel 5.15.167.4-1, cgroup v2 enabled by the setting below |
+| kind | 0.33.0 | Installed with winget; SHA-256 matched the official checksum |
 | kubectl | 1.36.1 | Bundled with Docker Desktop |
-| kind | Not installed | Planned for Milestone 1 |
+| Kubernetes | 1.37.0 | Single-node kind cluster |
+| Kubernetes Python client | 37.0.1 | Pinned in `backend/requirements.txt` |
 | Trivy | Not installed | Planned for Milestone 8 |
-| Jenkins | 2.555.3 | Already running as a Windows service on port 8080, set to start automatically |
+| Jenkins | 2.555.3 | Windows service on port 8080, set to start automatically |
 
-## Constraint: Docker uses cgroup v1
+kubectl 1.36 is one minor version behind the API server, which is [within the supported difference](https://kubernetes.io/releases/version-skew-policy/#kubectl).
 
-`docker info` reports `CgroupVersion=1` on kernel `5.15.167.4-microsoft-standard-WSL2`.
+## WSL setting: cgroup v2
 
-Cgroups are the Linux kernel feature that limits a container's CPU and memory. Since Kubernetes 1.35 the kubelet's `failCgroupV1` setting defaults to `true`, so the kubelet does not start on a cgroup v1 host. See the [Kubernetes cgroup v2 article](https://kubernetes.io/blog/2026/10/06/kubernetes-cgroups-v2-shift/).
+Cgroups are the Linux kernel feature that limits a container's CPU and memory. Since Kubernetes 1.35 the kubelet [requires cgroup v2 by default](https://kubernetes.io/blog/2026/10/06/kubernetes-cgroups-v2-shift/), so Docker must provide it.
 
-kind v0.33.0 defaults to Kubernetes 1.37, so a plain `kind create cluster` is expected to fail on this machine. This comes from the documentation and has not been tested here yet.
+`%USERPROFILE%\.wslconfig` contains exactly:
 
-**Milestone 1 plan:** use the newest image built for kind v0.33.0 that predates the change, pinned by digest as the release notes require:
-
-```text
-kindest/node:v1.34.11@sha256:44e222ee2132dab25ff87301682f89eb82c7880ea3a1bf543bfe9708fd08d67d
+```ini
+[wsl2]
+kernelCommandLine = cgroup_no_v1=all
 ```
 
-This needs no changes to the Windows or WSL configuration, so other projects are not affected. Two follow-ups for Milestone 1:
+- `kernelCommandLine` is a [documented WSL key](https://learn.microsoft.com/en-us/windows/wsl/wsl-config). Microsoft's page does not document this specific value.
+- WSL's [2.0.1 release note](https://github.com/microsoft/WSL/releases/tag/2.0.1) and [source code](https://github.com/microsoft/WSL/blob/master/src/linux/init/config.cpp) mount cgroup v2 when the value is exactly `all`. The 2.4.13 source is not public, so this was confirmed by testing on this machine.
+- The file applies to all WSL distributions. `docker-desktop` is the only one here.
 
-- The bundled kubectl 1.36 is two minor versions ahead of a 1.34 cluster, while Kubernetes supports a difference of one. Check whether a matching kubectl is needed.
-- Check whether 1.34 is still within upstream support, and record the answer as a known limitation if it is not.
+Verify it with:
 
-## Other observations
+```powershell
+docker info --format '{{.CgroupVersion}}'
+docker run --rm --pull=never python:3.11-slim stat -fc %T /sys/fs/cgroup
+```
 
-- **Virtualization:** `VirtualizationFirmwareEnabled` reads `False`, but `HypervisorPresent` is `True` and Linux containers run. Privileged containers, which kind needs, also run.
-- **Docker counters:** `docker info` reported 6 running containers while `docker ps` listed none and `docker system df` showed 0 active. `docker ps` was treated as the accurate source.
-- **WSL listing:** `wsl -l -v` shows `docker-desktop` as `Stopped` even though containers run on the WSL2 kernel. The cause is unknown and it has not blocked anything.
+The expected output is `2` and `cgroup2fs`. Do not use `stat` from an Alpine image for this check: BusyBox prints `UNKNOWN` for this filesystem.
+
+To remove the setting, run the commands below. Kubernetes 1.37 cannot run without it, so delete the kind cluster first.
+
+```powershell
+docker desktop stop
+Remove-Item "$HOME\.wslconfig"
+wsl --shutdown
+docker desktop start
+```
+
+A rollback rehearsal on 2026-11-01 restored the WSL configuration, kernel command line, cgroup state, containers, images, volumes, networks and Git state. Docker's reported total memory differed by 4,096 bytes; the cause was not investigated.
+
+## Resource use
+
+Measured with the cluster and sample workload running:
+
+| Item | Value |
+|---|---|
+| kind node memory | About 730 MiB |
+| kind node CPU when idle | About 0.18 CPU |
+| Windows free RAM | 2.6 GB, with VS Code and browsers open |
+
+The Docker VM holds on to file cache, so Windows free RAM is the practical limit on this machine. Avoid running other projects' stacks at the same time as the cluster.
 
 ## Ports
 
-| Port | Current or expected use |
+| Port | Use |
 |---|---|
 | 8000 | This project's backend |
 | 5173 | This project's frontend dev server |
+| Random, on 127.0.0.1 | Kubernetes API server, recorded in the kubeconfig |
 | 8080 | Existing Jenkins Windows service |
 | 8081 | Terraform project nginx (container currently stopped) |
 | 3000 | Terraform project Grafana (container currently stopped) |
 | 9090 | Terraform project Prometheus (container currently stopped) |
 
 Milestones 8 and 9 must avoid these ports or run while those services are stopped.
+
+## Known limitations
+
+- Kubernetes 1.37.0 is not the latest patch release. kind v0.33.0 ships a pre-built image for 1.37.0 only.
+- The cluster reports `PossibleMemoryBackedVolumesOnDisk`: memory-backed volumes, including Secrets, may be swapped to disk. Do not store real secrets in this cluster.
+- Other projects' containers have not been tested on cgroup v2.
+- Whether the cluster survives a Docker restart has not been tested.
 
 ## Change from the planned stack
 

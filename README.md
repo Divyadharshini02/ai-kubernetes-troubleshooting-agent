@@ -4,17 +4,28 @@ Evidence-based Kubernetes incident investigation and recovery assistant. The ful
 
 ## Current status
 
-**Milestone 0 (foundation) only.** A FastAPI backend with a health endpoint and a React page that displays it.
+| Milestone | Status |
+|---|---|
+| M0: Environment and foundation | Done |
+| [M1: Local Kubernetes connectivity](docs/M1_LOCAL_KUBERNETES.md) | Done |
+| M2 to M10 | Not started |
 
-The application does not investigate clusters yet. Kubernetes connectivity, evidence collection, diagnostics, AI, Jenkins and monitoring are planned for later milestones.
+**What works today:** a FastAPI backend that reads real nodes and pods from a local kind cluster, and a React page that shows backend health.
+
+**What does not exist yet:** the application does not investigate or diagnose anything. Evidence collection, diagnostics, AI, Jenkins and monitoring are planned for later milestones.
 
 ## Prerequisites
 
 - Python 3.13
 - Node.js 22.12 or newer
 - Git
+- Docker Desktop with cgroup v2, and kind 0.33.0 (only for the cluster features)
 
 Environment findings for this project's development machine are in [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md).
+
+## Set up the cluster
+
+Follow [docs/M1_LOCAL_KUBERNETES.md](docs/M1_LOCAL_KUBERNETES.md#set-up-the-cluster). The backend and frontend still start without a cluster; the cluster endpoint then returns HTTP 503.
 
 ## Run the backend
 
@@ -27,7 +38,11 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8000
 ```
 
-Check it at <http://127.0.0.1:8000/api/health>. Interactive API docs are at <http://127.0.0.1:8000/docs>.
+| URL | Purpose |
+|---|---|
+| <http://127.0.0.1:8000/api/health> | Backend health |
+| <http://127.0.0.1:8000/api/cluster/health> | Live nodes and pods from the current kubeconfig context |
+| <http://127.0.0.1:8000/docs> | Interactive API docs |
 
 ## Run the frontend
 
@@ -44,8 +59,11 @@ Open <http://localhost:5173>. The page shows the live result from the backend, o
 ## Run the checks
 
 ```powershell
-# From backend/
+# From backend/: tests that need no cluster
 .\.venv\Scripts\python.exe -m pytest
+
+# From backend/: tests against the real kind cluster
+.\.venv\Scripts\python.exe -m pytest -m cluster
 
 # From frontend/
 npm run lint
