@@ -18,6 +18,10 @@ def get_namespace_evidence(namespace: NamespaceName) -> EvidenceBundle:
 
     This reports evidence only. It does not diagnose anything or change the cluster.
     """
+    return collect_or_http_error(namespace)
+
+
+def collect_or_http_error(namespace: str) -> EvidenceBundle:
     try:
         return collect_namespace_evidence(namespace)
     except NamespaceNotFoundError as exc:

@@ -8,12 +8,13 @@ Evidence-based Kubernetes incident investigation and recovery assistant. The ful
 |---|---|
 | M0: Environment and foundation | Done |
 | [M1: Local Kubernetes connectivity](docs/M1_LOCAL_KUBERNETES.md) | Done |
-| [M2: Evidence collection](docs/M2_EVIDENCE_COLLECTION.md) | Implemented, awaiting review |
-| M3 to M10 | Not started |
+| [M2: Evidence collection](docs/M2_EVIDENCE_COLLECTION.md) | Done |
+| [M3: Deterministic diagnostics](docs/M3_DIAGNOSTICS.md) | Done |
+| M4 to M10 | Not started |
 
-**What works today:** a FastAPI backend that reads real nodes and pods from a local kind cluster and collects read-only evidence for a namespace, and a React page that shows backend health.
+**What works today:** a FastAPI backend that reads real resources from a local kind cluster, collects read-only evidence for a namespace, and diagnoses five failure scenarios using deterministic rules. A React page shows backend health.
 
-**What does not exist yet:** the application collects evidence but does not diagnose anything. Diagnostics, AI, Jenkins and monitoring are planned for later milestones.
+**What does not exist yet:** there is no AI, no investigation screen and no saved history. AI, the dashboard, Jenkins and monitoring are planned for later milestones. The application suggests fixes but never applies them.
 
 ## Prerequisites
 
@@ -44,6 +45,7 @@ python -m venv .venv
 | <http://127.0.0.1:8000/api/health> | Backend health |
 | <http://127.0.0.1:8000/api/cluster/health> | Live nodes and pods from the current kubeconfig context |
 | <http://127.0.0.1:8000/api/namespaces/sample-app/evidence> | Live evidence for one namespace |
+| <http://127.0.0.1:8000/api/namespaces/sample-app/diagnosis> | Deterministic diagnosis of one namespace |
 | <http://127.0.0.1:8000/docs> | Interactive API docs |
 
 ## Run the frontend

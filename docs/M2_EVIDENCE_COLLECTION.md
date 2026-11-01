@@ -4,7 +4,7 @@
 
 **Acceptance criterion:** evidence includes resource identity, timestamps, source and collection status.
 
-**Status:** implemented and tested, awaiting review. This milestone reports evidence only. It does not diagnose anything, call an LLM or change the cluster.
+**Status:** complete. This milestone reports evidence only. It does not diagnose anything, call an LLM or change the cluster. Diagnosis is added by [Milestone 3](M3_DIAGNOSTICS.md).
 
 ## The endpoint
 
@@ -70,7 +70,7 @@ An empty result and a failed request always produce different records.
 | Service selector mismatch | Service selector, ports and target ports, pod labels, EndpointSlice addresses and readiness, Deployment and ReplicaSet status |
 | Probe failures | Readiness, liveness and startup probe configuration, container state, readiness, restart count, probe events |
 
-The evidence for each scenario is collected, but deciding which scenario applies is Milestone 3.
+This milestone collects the evidence. [Milestone 3](M3_DIAGNOSTICS.md) decides which scenario applies.
 
 ## Safety
 
@@ -115,7 +115,7 @@ unable to retrieve container logs for containerd://...
 
 Logs are requested with timestamps, so a body that does not start with one is not application output. It is recorded as `not_available`, with the text in `data.api_message` and never in `data.text`.
 
-**For Milestone 3:** previous logs being unavailable is normal for a crash loop. It must not be treated as evidence of anything, and crash output may be in either stream.
+Previous logs being unavailable is normal for a crash loop. It is not evidence of anything, and crash output may be in either stream.
 
 ## Run the tests
 
@@ -176,5 +176,5 @@ Results from 2026-11-01:
 - **Node requests are not totalled:** pods in other namespaces are not read, so per-node usage is not calculated. The scheduler's events report insufficient resources.
 - **PersistentVolumes are not read:** binding evidence comes from claims, StorageClasses and events.
 - **Namespace events only:** events recorded on nodes in the `default` namespace are not collected for other namespaces.
-- **Selector matching is not evaluated:** selectors and labels are reported as raw facts for Milestone 3 to compare.
+- **Raw facts only:** collectors report selectors and labels without comparing them. [Milestone 3](M3_DIAGNOSTICS.md) does the comparing.
 - **Event retention:** Kubernetes deletes old events, one hour by default, so a missing event does not prove nothing happened.

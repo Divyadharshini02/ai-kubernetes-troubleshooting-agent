@@ -28,10 +28,12 @@ class NamespaceNotFoundError(Exception):
     pass
 
 
-def _collector_outcome(collector: str, code: str, message: str, status: str) -> EvidenceRecord:
+def _collector_outcome(
+    collector: str, category: str, code: str, message: str, status: str
+) -> EvidenceRecord:
     return EvidenceRecord(
         evidence_id=f"{collector}:collector",
-        category=collector,
+        category=category,
         resource_kind="Collector",
         collected_at=utc_now(),
         source=f"collector:{collector}",
@@ -66,24 +68,27 @@ def collect_namespace_evidence(namespace: str) -> EvidenceBundle:
             )
 
         records = [namespace_record]
+        # The category matches the records each collector produces, so a failed
+        # collector marks that kind of evidence as unavailable.
         collectors = [
-            ("pods", collect_pods),
-            ("logs", lambda current: collect_logs(current, records)),
-            ("events", collect_events),
-            ("deployments", collect_deployments),
-            ("replicasets", collect_replica_sets),
-            ("services", collect_services),
-            ("endpointslices", collect_endpoint_slices),
-            ("nodes", collect_nodes),
-            ("pvcs", collect_persistent_volume_claims),
-            ("storageclasses", collect_storage_classes),
-            ("serviceaccounts", collect_service_accounts),
+            ("pods", "pod", collect_pods),
+            ("logs", "logs", lambda current: collect_logs(current, records)),
+            ("events", "event", collect_events),
+            ("deployments", "deployment", collect_deployments),
+            ("replicasets", "replicaset", collect_replica_sets),
+            ("services", "service", collect_services),
+            ("endpointslices", "endpointslice", collect_endpoint_slices),
+            ("nodes", "node", collect_nodes),
+            ("pvcs", "pvc", collect_persistent_volume_claims),
+            ("storageclasses", "storageclass", collect_storage_classes),
+            ("serviceaccounts", "serviceaccount", collect_service_accounts),
         ]
-        for name, collector in collectors:
+        for name, category, collector in collectors:
             if ctx.expired():
                 records.append(
                     _collector_outcome(
                         name,
+                        category,
                         "deadline_exceeded",
                         "The collection time limit was reached before this collector ran.",
                         "skipped",
@@ -98,6 +103,7 @@ def collect_namespace_evidence(namespace: str) -> EvidenceBundle:
                 records.append(
                     _collector_outcome(
                         name,
+                        category,
                         "collector_error",
                         "This collector failed unexpectedly.",
                         "failed",
