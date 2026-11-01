@@ -1,0 +1,28 @@
+.page {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 32px 16px;
+}
+
+.page h1 {
+  font-size: 1.5rem;
+}
+
+.card {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.card h2 {
+  margin-top: 0;
+  font-size: 1.1rem;
+}
+
+.status-ok {
+  color: var(--ok);
+}
+
+.status-error {
+  color: var(--error);
+}

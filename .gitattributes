@@ -1,0 +1,5 @@
+# Store text with LF in Git so files work inside Linux containers.
+* text=auto
+*.sh text eol=lf
+*.ps1 text eol=crlf
+*.png binary

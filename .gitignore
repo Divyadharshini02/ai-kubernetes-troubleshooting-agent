@@ -1,0 +1,34 @@
+# Secrets and local configuration: never commit these
+.env
+.env.*
+!.env.example
+*.kubeconfig
+kubeconfig
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node and frontend builds
+node_modules/
+dist/
+
+# Local data
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs and generated reports
+*.log
+reports/
+
+# Editor and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
