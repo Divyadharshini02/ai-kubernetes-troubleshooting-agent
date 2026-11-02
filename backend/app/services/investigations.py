@@ -5,6 +5,7 @@ Nothing here changes the cluster, and an LLM explanation cannot change the diagn
 """
 
 import logging
+import time
 import uuid
 
 from app.agent.explainer import explain_report
@@ -12,6 +13,7 @@ from app.diagnostics.engine import diagnose
 from app.kubernetes.cluster import ClusterAccessError, read_cluster_health
 from app.models.diagnosis import DiagnosticReport
 from app.models.investigation import InvestigationSummary, VerificationStatus
+from app.observability.metrics import record_investigation_completed, record_investigation_failed
 from app.services.evidence import NamespaceNotFoundError, collect_namespace_evidence
 from app.storage import investigations as storage
 
@@ -42,7 +44,7 @@ def recovery_status(previous: str | None, report: DiagnosticReport) -> Verificat
     return "not_verified"
 
 
-def _investigate(investigation_id: str, namespace: str, explain: bool) -> None:
+def _investigate(investigation_id: str, namespace: str, explain: bool) -> tuple[DiagnosticReport, VerificationStatus]:
     health = read_cluster_health()
     storage.add_event(investigation_id, "connectivity_checked", f"Connected to context {health.context}.")
 
@@ -68,25 +70,34 @@ def _investigate(investigation_id: str, namespace: str, explain: bool) -> None:
     report.evidence = bundle
     status = recovery_status(storage.previous_outcome(investigation_id, namespace), report)
     storage.complete_investigation(investigation_id, report, status)
+    return report, status
 
 
 def run_investigation(investigation_id: str, namespace: str, explain: bool) -> None:
-    """Run to a final saved status. This runs after the response, so it must not raise."""
+    """Run to a final saved status. This runs after the response, so it must not raise.
+
+    Metrics are recorded once, only after a final status has been saved, so they cannot disagree
+    with the saved history by counting something that was lost.
+    """
+    started = time.monotonic()
+
+    def fail(code: str, message: str) -> None:
+        storage.fail_investigation(investigation_id, code, message)
+        record_investigation_failed(code, time.monotonic() - started)
+
     try:
         try:
-            _investigate(investigation_id, namespace, explain)
+            report, status = _investigate(investigation_id, namespace, explain)
         except NamespaceNotFoundError:
-            storage.fail_investigation(
-                investigation_id, "namespace_not_found", "The Kubernetes API reports that this namespace does not exist."
-            )
+            fail("namespace_not_found", "The Kubernetes API reports that this namespace does not exist.")
         except ClusterAccessError as exc:
-            storage.fail_investigation(investigation_id, exc.code, exc.message)
+            fail(exc.code, exc.message)
         except Exception as exc:
             # The type only: exception text can quote cluster data.
             logger.warning("Investigation failed unexpectedly: %s", type(exc).__name__)
-            storage.fail_investigation(
-                investigation_id, "unexpected_error", "The investigation failed unexpectedly. Check the backend log."
-            )
+            fail("unexpected_error", "The investigation failed unexpectedly. Check the backend log.")
+        else:
+            record_investigation_completed(report, status, time.monotonic() - started)
     except storage.StorageError as exc:
         # It stays marked running until the next backend start marks it as interrupted.
         logger.warning("Could not save the investigation's failure: %s", exc)

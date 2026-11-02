@@ -1,0 +1,29 @@
+# Shown in Prometheus only: there is no Alertmanager, so nothing sends a notification.
+groups:
+  - name: troubleshooting-agent
+    rules:
+      - alert: BackendDown
+        expr: up{job="backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: Prometheus cannot scrape the backend.
+          description: The backend has not answered for at least a minute. Check its container and log.
+
+      - alert: BackendErrorsHigh
+        expr: increase(troubleshooting_http_server_errors_total[5m]) >= 5
+        labels:
+          severity: warning
+        annotations:
+          summary: The backend returned many server errors.
+          description: At least 5 responses in 5 minutes were 5xx. Cluster and credential problems appear as 502 and 503.
+
+      # A namespace that does not exist is left out: that is user input, not an incident.
+      - alert: ClusterAccessFailing
+        expr: sum(increase(troubleshooting_investigation_failures_total{code=~"cluster_access_denied|kubeconfig_unavailable|cluster_unreachable"}[15m])) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: Investigations are failing because the cluster cannot be used.
+          description: Often an expired 8-hour token. Run scripts/new_readonly_kubeconfig.py, as described in docs/M7_RBAC_SECURITY.md.

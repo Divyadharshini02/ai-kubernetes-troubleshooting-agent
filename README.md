@@ -15,7 +15,8 @@ Evidence-based Kubernetes incident investigation and recovery assistant. The ful
 | [M6: Failure scenarios and recovery verification](docs/M6_FAILURE_SCENARIOS.md) | Done |
 | [M7: Kubernetes RBAC and security](docs/M7_RBAC_SECURITY.md) | Done |
 | [M8: Docker, Jenkins CI/CD and Trivy](docs/M8_DOCKER_JENKINS_TRIVY.md) | M8 completed |
-| M9 to M10 | Not started |
+| [M9: Prometheus and Grafana monitoring](docs/M9_MONITORING.md) | M9 completed |
+| M10 | Not started |
 
 **What works today:** a React dashboard investigates a namespace in a real local kind cluster. It shows live progress, a diagnosis of five failure scenarios from deterministic rules, the read-only evidence behind it, and saved history that survives restarts. Reproducible failures in [k8s/scenarios](k8s/scenarios) demonstrate the full lifecycle, and a fresh investigation after a manual fix shows whether earlier problems are still detected. An optional LLM can explain those diagnoses in clearer language, and the project works fully without it.
 
@@ -23,7 +24,7 @@ The backend uses a dedicated read-only ServiceAccount, so the cluster itself ref
 
 The application also runs in Docker, and a local Jenkins pipeline tests, builds and scans it with Trivy. Nothing is published.
 
-**What does not exist yet:** monitoring is planned for a later milestone.
+Optional Prometheus and Grafana containers scrape real metrics from the backend. One provisioned dashboard shows investigation activity, and three alert rules appear in Prometheus. Nothing sends notifications.
 
 ## Prerequisites
 
@@ -80,7 +81,7 @@ Open <http://localhost:5173>, enter a namespace such as `sample-app`, and click 
 
 ## Run it in Docker
 
-To run the application in containers, at <http://localhost:8088>, or the Jenkins pipeline, at <http://localhost:8090>, follow [docs/M8_DOCKER_JENKINS_TRIVY.md](docs/M8_DOCKER_JENKINS_TRIVY.md).
+To run the application in containers, at <http://localhost:8088>, or the Jenkins pipeline, at <http://localhost:8090>, follow [docs/M8_DOCKER_JENKINS_TRIVY.md](docs/M8_DOCKER_JENKINS_TRIVY.md). To add Prometheus and Grafana, at <http://localhost:3001>, follow [docs/M9_MONITORING.md](docs/M9_MONITORING.md).
 
 ## Run the checks
 

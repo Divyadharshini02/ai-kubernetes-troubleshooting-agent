@@ -1,12 +1,14 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 
 from app import __version__
 from app.api import cluster, diagnosis, evidence, health, investigations
 from app.kubernetes.cluster import ALLOW_DEFAULT_KUBECONFIG, default_kubeconfig_allowed
+from app.observability import metrics
+from app.observability.middleware import METRICS_PATH, MetricsMiddleware
 from app.storage.investigations import StorageError, mark_interrupted
 
 logger = logging.getLogger(__name__)
@@ -27,11 +29,19 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="AI Kubernetes Troubleshooting Agent", version=__version__, lifespan=lifespan)
+app.add_middleware(MetricsMiddleware)
 app.include_router(health.router, prefix="/api")
 app.include_router(cluster.router, prefix="/api")
 app.include_router(evidence.router, prefix="/api")
 app.include_router(diagnosis.router, prefix="/api")
 app.include_router(investigations.router, prefix="/api")
+
+
+# Outside /api on purpose: nginx proxies only /api/, so this is not reachable through the frontend.
+@app.get(METRICS_PATH, include_in_schema=False)
+def get_metrics() -> Response:
+    body, content_type = metrics.render()
+    return Response(body, media_type=content_type)
 
 
 @app.exception_handler(StorageError)

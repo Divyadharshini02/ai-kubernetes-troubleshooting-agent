@@ -1,0 +1,75 @@
+# Run with: promtool test rules alerts.test.yml
+rule_files:
+  - alerts.yml
+
+evaluation_interval: 15s
+
+tests:
+  - name: BackendDown waits a minute, then clears on recovery
+    interval: 15s
+    input_series:
+      - series: 'up{job="backend"}'
+        values: '1x4 0x8 1x4'
+    alert_rule_test:
+      - eval_time: 45s
+        alertname: BackendDown
+        exp_alerts: []
+      - eval_time: 1m30s
+        alertname: BackendDown
+        exp_alerts: []
+      - eval_time: 2m15s
+        alertname: BackendDown
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job: backend
+            exp_annotations:
+              summary: Prometheus cannot scrape the backend.
+              description: The backend has not answered for at least a minute. Check its container and log.
+      - eval_time: 3m45s
+        alertname: BackendDown
+        exp_alerts: []
+
+  - name: BackendErrorsHigh needs several server errors
+    interval: 1m
+    input_series:
+      - series: 'troubleshooting_http_server_errors_total'
+        values: '0 1 2 3 10 20 20 20 20 20 20 20 20 20'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: BackendErrorsHigh
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: BackendErrorsHigh
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: The backend returned many server errors.
+              description: At least 5 responses in 5 minutes were 5xx. Cluster and credential problems appear as 502 and 503.
+      - eval_time: 13m
+        alertname: BackendErrorsHigh
+        exp_alerts: []
+
+  - name: ClusterAccessFailing reacts to cluster failures but not to a mistyped namespace
+    interval: 1m
+    input_series:
+      - series: 'troubleshooting_investigation_failures_total{code="cluster_access_denied"}'
+        values: '0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1'
+      - series: 'troubleshooting_investigation_failures_total{code="namespace_not_found"}'
+        values: '0 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: ClusterAccessFailing
+        exp_alerts: []
+      - eval_time: 7m
+        alertname: ClusterAccessFailing
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: Investigations are failing because the cluster cannot be used.
+              description: Often an expired 8-hour token. Run scripts/new_readonly_kubeconfig.py, as described in docs/M7_RBAC_SECURITY.md.
+      - eval_time: 25m
+        alertname: ClusterAccessFailing
+        exp_alerts: []

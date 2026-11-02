@@ -69,4 +69,14 @@ expect "backend health" "$(backend_request /api/health)" '200 {"status":"ok"'
 expect "no credentials means a clear refusal" "$(backend_request /api/cluster/health)" '503 {"detail":{"code":"kubeconfig_unavailable"'
 expect "frontend serves the application" "$(docker exec "$frontend" wget -q -O - http://127.0.0.1:8080/)" '<div id="root"'
 expect "frontend proxies to the backend" "$(docker exec "$frontend" wget -q -O - http://127.0.0.1:8080/api/health)" '"status":"ok"'
+expect "backend exposes metrics" "$(backend_request /metrics)" 'troubleshooting_investigations_total'
+expect "metrics count real requests" "$(backend_request /metrics)" 'troubleshooting_http_requests_total{method="GET",route="/api/cluster/health",status="503"} 1.0'
+frontend_metrics="$(docker exec "$frontend" wget -q -O - http://127.0.0.1:8080/metrics)"
+case "$frontend_metrics" in
+    *troubleshooting_*)
+        echo "FAILED: the frontend serves backend metrics"
+        exit 1
+        ;;
+    *) echo "OK: the frontend does not serve metrics" ;;
+esac
 echo "Smoke test passed"

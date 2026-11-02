@@ -27,6 +27,7 @@ pipeline {
         NODE_IMAGE = 'node:22-alpine@sha256:fe4f6d74e20370acb04ad889077d14d0f64a9c8ea6a42bc60cddf1e844699914'
         KUBECONFORM_IMAGE = 'ghcr.io/yannh/kubeconform:latest@sha256:faffaf43f95aa6425306e1ab8d6fcad72acb9049158f38e574c085ea1ec0f64e'
         TRIVY_IMAGE = 'aquasec/trivy:0.76.1@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c'
+        PROMETHEUS_IMAGE = 'prom/prometheus:v3.15.1@sha256:fa3302279710be2f21a8301ec17a8b4f2301fd829bd113839b3b6b02b6f191a2'
         BACKEND_IMAGE = 'troubleshooting-agent-backend'
         FRONTEND_IMAGE = 'troubleshooting-agent-frontend'
     }
@@ -92,6 +93,22 @@ pipeline {
                         exit 1
                     fi
                     cat reports/kubeconform.txt
+                '''
+            }
+        }
+
+        stage('Validate monitoring') {
+            options { timeout(time: 5, unit: 'MINUTES') }
+            steps {
+                // Backend tests check the dashboard. Prometheus itself is not run here, to save memory.
+                sh '''
+                    promtool() {
+                        docker run --rm --label ci=troubleshooting-agent -v "$WORKSPACE/monitoring/prometheus:/etc/prometheus:ro" \
+                            -w /etc/prometheus --entrypoint promtool "$PROMETHEUS_IMAGE" "$@"
+                    }
+                    promtool check config --syntax-only prometheus.yml
+                    promtool check rules alerts.yml
+                    promtool test rules alerts.test.yml
                 '''
             }
         }

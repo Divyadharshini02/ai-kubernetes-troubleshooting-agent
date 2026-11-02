@@ -15,6 +15,7 @@ from app.core.config import Settings, load_settings
 from app.models.diagnosis import Diagnosis, DiagnosticReport
 from app.models.evidence import EvidenceBundle
 from app.models.explanation import DiagnosisExplanation, LlmReport
+from app.observability.metrics import record_llm_explanation, record_llm_request
 
 logger = logging.getLogger(__name__)
 
@@ -72,11 +73,26 @@ def _configuration_problem(settings: Settings | None) -> str | None:
     return None
 
 
+def _timed_complete(provider: LlmProvider, user_message: str, deadline: float) -> str:
+    started = time.monotonic()
+    error_reason = None
+    try:
+        return provider.complete(SYSTEM_PROMPT, user_message, OUTPUT_SCHEMA, deadline)
+    except ProviderError as exc:
+        error_reason = exc.code
+        raise
+    except Exception:
+        error_reason = "unexpected_error"
+        raise
+    finally:
+        record_llm_request(time.monotonic() - started, error_reason)
+
+
 def _complete_with_retries(provider: LlmProvider, user_message: str, max_retries: int, deadline: float) -> str:
     attempt = 0
     while True:
         try:
-            return provider.complete(SYSTEM_PROMPT, user_message, OUTPUT_SCHEMA, deadline)
+            return _timed_complete(provider, user_message, deadline)
         except ProviderError as exc:
             if not exc.retryable or attempt >= max_retries or time.monotonic() + RETRY_DELAY_SECONDS >= deadline:
                 raise
@@ -134,6 +150,12 @@ def _explain_all(provider, settings, report, bundle) -> list[DiagnosisExplanatio
 
 def explain_report(report: DiagnosticReport, bundle: EvidenceBundle) -> LlmReport:
     """Explain the diagnoses in a report. This never raises and never changes the report."""
+    llm = _explain_safely(report, bundle)
+    record_llm_explanation(llm.status, llm.reason)
+    return llm
+
+
+def _explain_safely(report: DiagnosticReport, bundle: EvidenceBundle) -> LlmReport:
     try:
         return _build_report(report, bundle)
     # The last line of defence: an optional feature must never cost the user the diagnosis.
