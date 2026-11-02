@@ -107,6 +107,14 @@ function Diagnosis({ diagnosis, llm, startOpen }) {
   )
 }
 
+const RECOVERY_TEXT = {
+  recovered:
+    'Recovered: the previous investigation of this namespace found problems, and this one no longer detects any supported problem. This does not prove that the application is fully healthy.',
+  still_failing:
+    'Still failing: the previous investigation of this namespace found problems, and this one still detects supported problems.',
+  not_verified: 'Not verified: there is no earlier problem to compare with, or the evidence is inconclusive.',
+}
+
 function aiStatusText(investigation) {
   const llm = investigation.report?.llm
   if (!investigation.explain_requested || !llm) {
@@ -150,7 +158,9 @@ function DiagnosisReport({ investigation }) {
             <dt>AI explanation</dt>
             <dd>{aiStatusText(investigation)}</dd>
             <dt>Recovery verification</dt>
-            <dd>Not verified</dd>
+            <dd className={`recovery-${investigation.verification_status}`}>
+              {RECOVERY_TEXT[investigation.verification_status]}
+            </dd>
           </dl>
           {report.diagnoses.map((diagnosis, index) => (
             <Diagnosis key={diagnosis.diagnosis_id} diagnosis={diagnosis} llm={report.llm} startOpen={index === 0} />

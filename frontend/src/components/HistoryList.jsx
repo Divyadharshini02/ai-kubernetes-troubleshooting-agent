@@ -1,3 +1,8 @@
+const RECOVERY_LABELS = {
+  recovered: 'Recovered',
+  still_failing: 'Still failing',
+}
+
 function resultText(item) {
   if (item.status === 'running') {
     return 'Running'
@@ -29,6 +34,9 @@ function HistoryList({ history, selectedId, onSelect, onRefresh }) {
               >
                 <strong>{item.namespace}</strong>
                 <span className={item.status === 'failed' ? 'status-error' : undefined}>{resultText(item)}</span>
+                {RECOVERY_LABELS[item.verification_status] && (
+                  <span className={`recovery-${item.verification_status}`}>{RECOVERY_LABELS[item.verification_status]}</span>
+                )}
                 <span className="muted">{new Date(item.started_at).toLocaleString()}</span>
               </button>
             </li>

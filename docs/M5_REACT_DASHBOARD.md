@@ -65,7 +65,7 @@ The database is `backend/data/investigations.db`, using Python's standard `sqlit
 | `id` | A random ID |
 | `namespace`, `explain_requested` | What was asked for |
 | `status` | `running`, `completed` or `failed` |
-| `verification_status` | Always `not_verified`, until Milestone 6 |
+| `verification_status` | See [recovery verification](M6_FAILURE_SCENARIOS.md#how-recovery-verification-works), added in Milestone 6 |
 | `started_at`, `completed_at`, `duration_seconds` | Timing |
 | `outcome`, `summary`, `diagnosis_count` | The result, for the history list |
 | `ai_status`, `ai_reason` | The LLM result, empty if not requested |

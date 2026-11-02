@@ -109,16 +109,35 @@ def add_event(investigation_id: str, stage: str, message: str) -> None:
         _add_event(connection, investigation_id, stage, message)
 
 
-def complete_investigation(investigation_id: str, report: DiagnosticReport) -> None:
+def previous_outcome(investigation_id: str, namespace: str) -> str | None:
+    """The outcome of the latest earlier conclusive investigation of this namespace.
+
+    Failed, interrupted and inconclusive investigations show nothing about whether a problem
+    was present, so they are skipped. Looking too soon after a fix does not lose the comparison.
+    """
+    with _connection() as connection:
+        row = connection.execute(
+            "SELECT outcome FROM investigations WHERE namespace = ? AND status = 'completed' "
+            "AND outcome != 'insufficient_evidence' "
+            "AND started_at < (SELECT started_at FROM investigations WHERE id = ?) "
+            "ORDER BY started_at DESC LIMIT 1",
+            (namespace, investigation_id),
+        ).fetchone()
+    return row["outcome"] if row else None
+
+
+def complete_investigation(investigation_id: str, report: DiagnosticReport, verification_status: str) -> None:
     """Save the report and its final events together, so a reader never sees only some of them."""
     finished_at = utc_now()
     with _connection() as connection:
         connection.execute(
-            "UPDATE investigations SET status = 'completed', completed_at = ?, duration_seconds = ?, outcome = ?, "
+            "UPDATE investigations SET status = 'completed', completed_at = ?, duration_seconds = ?, "
+            "verification_status = ?, outcome = ?, "
             "summary = ?, diagnosis_count = ?, ai_status = ?, ai_reason = ?, report_json = ? WHERE id = ?",
             (
                 finished_at.isoformat(),
                 _duration(connection, investigation_id, finished_at),
+                verification_status,
                 report.outcome,
                 report.summary,
                 len(report.diagnoses),

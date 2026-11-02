@@ -10,7 +10,8 @@ import uuid
 from app.agent.explainer import explain_report
 from app.diagnostics.engine import diagnose
 from app.kubernetes.cluster import ClusterAccessError, read_cluster_health
-from app.models.investigation import InvestigationSummary
+from app.models.diagnosis import DiagnosticReport
+from app.models.investigation import InvestigationSummary, VerificationStatus
 from app.services.evidence import NamespaceNotFoundError, collect_namespace_evidence
 from app.storage import investigations as storage
 
@@ -19,6 +20,26 @@ logger = logging.getLogger(__name__)
 
 def start_investigation(namespace: str, explain: bool) -> InvestigationSummary:
     return storage.create_investigation(uuid.uuid4().hex, namespace, explain, f"Investigation of {namespace} created.")
+
+
+def recovery_status(previous: str | None, report: DiagnosticReport) -> VerificationStatus:
+    """Compare a finished report with the previous outcome for its namespace.
+
+    Only a confirmed earlier problem can be recovered from, and only complete evidence of
+    running pods with nothing detected can show that. Deleting a failing workload leaves
+    nothing to diagnose, which is not recovery. Anything else stays not_verified.
+    """
+    if previous != "problems_found":
+        return "not_verified"
+    if report.outcome == "problems_found":
+        return "still_failing"
+    if (
+        report.outcome == "no_problems_found"
+        and report.evidence_completeness == "complete"
+        and report.resources_examined.pods > 0
+    ):
+        return "recovered"
+    return "not_verified"
 
 
 def _investigate(investigation_id: str, namespace: str, explain: bool) -> None:
@@ -45,7 +66,8 @@ def _investigate(investigation_id: str, namespace: str, explain: bool) -> None:
         storage.add_event(investigation_id, "ai_finished", f"AI explanation status: {report.llm.status}.")
 
     report.evidence = bundle
-    storage.complete_investigation(investigation_id, report)
+    status = recovery_status(storage.previous_outcome(investigation_id, namespace), report)
+    storage.complete_investigation(investigation_id, report, status)
 
 
 def run_investigation(investigation_id: str, namespace: str, explain: bool) -> None:

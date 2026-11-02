@@ -66,6 +66,14 @@
   color: var(--warn);
 }
 
+.recovery-recovered {
+  color: var(--ok);
+}
+
+.recovery-still_failing {
+  color: var(--error);
+}
+
 .muted {
   color: var(--muted);
   font-size: 0.9rem;

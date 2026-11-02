@@ -1,0 +1,42 @@
+# Fault: the image cannot be pulled. Apply over healthy.yaml.
+# The .invalid domain can never resolve, so no registry is contacted and no internet is needed.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-web
+  namespace: failure-demo
+  labels:
+    app: demo-web
+    app.kubernetes.io/managed-by: failure-scenarios
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: demo-web
+  template:
+    metadata:
+      labels:
+        app: demo-web
+        app.kubernetes.io/managed-by: failure-scenarios
+    spec:
+      terminationGracePeriodSeconds: 1
+      containers:
+        - name: web
+          image: registry.invalid/demo-web:1.0
+          ports:
+            - name: http
+              containerPort: 80
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 5

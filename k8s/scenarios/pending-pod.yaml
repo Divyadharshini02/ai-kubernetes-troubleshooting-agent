@@ -1,0 +1,43 @@
+# Fault: no node has the required label, so the pod cannot be scheduled. Apply over healthy.yaml.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-web
+  namespace: failure-demo
+  labels:
+    app: demo-web
+    app.kubernetes.io/managed-by: failure-scenarios
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: demo-web
+  template:
+    metadata:
+      labels:
+        app: demo-web
+        app.kubernetes.io/managed-by: failure-scenarios
+    spec:
+      terminationGracePeriodSeconds: 1
+      nodeSelector:
+        failure-demo/no-such-node: "true"
+      containers:
+        - name: web
+          image: nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10
+          ports:
+            - name: http
+              containerPort: 80
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 5

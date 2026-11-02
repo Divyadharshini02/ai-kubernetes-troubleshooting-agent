@@ -12,11 +12,12 @@ Evidence-based Kubernetes incident investigation and recovery assistant. The ful
 | [M3: Deterministic diagnostics](docs/M3_DIAGNOSTICS.md) | Done |
 | [M4: Optional LLM integration](docs/M4_LLM_INTEGRATION.md) | Accepted with documented limitations, not yet run against the real provider |
 | [M5: React dashboard](docs/M5_REACT_DASHBOARD.md) | Done |
-| M6 to M10 | Not started |
+| [M6: Failure scenarios and recovery verification](docs/M6_FAILURE_SCENARIOS.md) | Done |
+| M7 to M10 | Not started |
 
-**What works today:** a React dashboard investigates a namespace in a real local kind cluster. It shows live progress, a diagnosis of five failure scenarios from deterministic rules, the read-only evidence behind it, and saved history that survives restarts. An optional LLM can explain those diagnoses in clearer language, and the project works fully without it.
+**What works today:** a React dashboard investigates a namespace in a real local kind cluster. It shows live progress, a diagnosis of five failure scenarios from deterministic rules, the read-only evidence behind it, and saved history that survives restarts. Reproducible failures in [k8s/scenarios](k8s/scenarios) demonstrate the full lifecycle, and a fresh investigation after a manual fix shows whether earlier problems are still detected. An optional LLM can explain those diagnoses in clearer language, and the project works fully without it.
 
-**What does not exist yet:** recovery verification, least-privilege Kubernetes access, Jenkins and monitoring are planned for later milestones. The application suggests fixes but never applies them.
+**What does not exist yet:** least-privilege Kubernetes access, Jenkins and monitoring are planned for later milestones. The application suggests fixes but never applies them.
 
 ## Prerequisites
 

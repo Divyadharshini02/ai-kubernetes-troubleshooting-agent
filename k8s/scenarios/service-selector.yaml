@@ -1,0 +1,17 @@
+# Fault: a typo in the selector. The pod stays healthy, but the Service has no endpoints.
+# Apply over healthy.yaml.
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo-web
+  namespace: failure-demo
+  labels:
+    app: demo-web
+    app.kubernetes.io/managed-by: failure-scenarios
+spec:
+  selector:
+    app: demo-wbe
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

@@ -7,8 +7,12 @@ from app.models.diagnosis import DiagnosticReport, ReportOutcome
 
 InvestigationStatus = Literal["running", "completed", "failed"]
 
-# Recovery verification arrives in Milestone 6, so nothing can be verified yet.
-VerificationStatus = Literal["not_verified"]
+# Compared with the previous conclusive investigation of the same namespace.
+# recovered: it found problems, and this one no longer detects any supported problem.
+# still_failing: it found problems, and this one still does.
+# not_verified: there is no earlier problem to compare with, or the evidence is inconclusive.
+# None of these says anything about problems the rules do not cover.
+VerificationStatus = Literal["recovered", "still_failing", "not_verified"]
 
 # Each stage is recorded only after the backend has actually reached it.
 ProgressStage = Literal[
