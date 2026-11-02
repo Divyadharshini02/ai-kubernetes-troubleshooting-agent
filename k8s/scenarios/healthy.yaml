@@ -47,6 +47,9 @@ spec:
             httpGet:
               path: /
               port: http
+            # nginx took 6 to 8 seconds to answer here. Probing sooner records failures that
+            # look like an unstable pod, even on an idle machine.
+            initialDelaySeconds: 10
             periodSeconds: 5
 ---
 apiVersion: v1

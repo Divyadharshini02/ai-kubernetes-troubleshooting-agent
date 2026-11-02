@@ -75,6 +75,13 @@ def sample_app_pods():
     }
 
 
+def readiness_failures():
+    """Readiness failures recorded for the current demo-web pod."""
+    pod = demo_pods()[0]["metadata"]["name"]
+    events = kubectl_json("events", "--field-selector", f"involvedObject.name={pod},reason=Unhealthy")["items"]
+    return sum(event.get("count") or 1 for event in events)
+
+
 def wait_for_rollout():
     run_kubectl("rollout", "status", "deployment/demo-web", "-n", NAMESPACE, "--timeout=120s")
 
@@ -190,6 +197,9 @@ def assert_diagnosis(diagnoses, scenario, title, strength, cause, categories=fro
 
 
 def test_healthy_baseline_detects_no_supported_problem(demo, sample_app_before):
+    # Regression: a normal start used to record enough failures to make the pod look unstable.
+    # Those count for 10 minutes, far longer than this waits, so waiting cannot hide them.
+    assert readiness_failures() < 3
     wait_for_outcome("no_problems_found")
 
     investigation = investigate()
@@ -205,6 +215,7 @@ def test_healthy_baseline_detects_no_supported_problem(demo, sample_app_before):
 def test_failure_is_diagnosed_and_recovery_is_verified(demo, sample_app_before, manifest):
     restore_healthy()
     wait_for_outcome("no_problems_found")
+    assert readiness_failures() < 3
     before = investigate()
     assert before["outcome"] == "no_problems_found"
 

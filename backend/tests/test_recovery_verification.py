@@ -278,6 +278,14 @@ def test_deployments_set_limits_and_have_no_liveness_probe(name):
                 assert "livenessProbe" not in container
 
 
+@pytest.mark.parametrize("name", [HEALTHY, *[fault for fault in FAULTS if fault != "service-selector.yaml"]])
+def test_readiness_probes_wait_for_a_normal_start(name):
+    # Regression: nginx took 6 to 8 seconds to answer, and 3 failures made a healthy pod look unstable.
+    deployment = next(document for document in documents(name) if document["kind"] == "Deployment")
+
+    assert containers(deployment)[0]["readinessProbe"]["initialDelaySeconds"] == 10
+
+
 def test_only_the_image_fault_uses_an_image_not_pinned_by_digest():
     for name in (HEALTHY, *FAULTS):
         for document in documents(name):

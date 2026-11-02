@@ -38,5 +38,7 @@ spec:
             httpGet:
               path: /no-such-path
               port: http
+            # The same delay as the baseline, so the only failures are the intended HTTP 404.
+            initialDelaySeconds: 10
             periodSeconds: 2
             failureThreshold: 1

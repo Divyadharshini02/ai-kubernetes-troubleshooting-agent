@@ -65,7 +65,7 @@ To investigate, open <http://localhost:5173>, enter `failure-demo` and click **I
 | `crash-loop.yaml` | At least 2 restarts, about 30 seconds | Container web is restarting repeatedly | Medium | May be missing required configuration | Exit code 3, and the log line about `DATABASE_URL` |
 | `image-pull.yaml` | `ErrImagePull` or `ImagePullBackOff` | Container web cannot pull its image | High | May be unable to reach the registry, or the name may be wrong | Container state and the pull failure event |
 | `pending-pod.yaml` | `Pending` | Pod … cannot be scheduled | High | The node selector may not match any node | `PodScheduled=False`, `FailedScheduling`, node labels |
-| `readiness-probe.yaml` | Running, `0/1` ready, a few seconds | Readiness probe of container web is failing | High | The probe path may be wrong, because the application answered HTTP 404 | `Unhealthy` events with status code 404 |
+| `readiness-probe.yaml` | Running, `0/1` ready, about 15 seconds | Readiness probe of container web is failing | High | The probe path may be wrong, because the application answered HTTP 404 | `Unhealthy` events with status code 404 |
 | `service-selector.yaml` | Pod `1/1` ready, a few seconds | Service demo-web selector matches no pods | High | The selector may contain a typo | The selector, the pod's labels, no ready endpoints |
 
 The first four also report **Service demo-web matches pods, but none are ready**. This is correct: taking the only pod out of service leaves the Service with no endpoints. These results are also asserted by the live tests.
@@ -128,12 +128,24 @@ The tests apply the same guards automatically, in [failure_scenarios.py](../back
 - **One known test issue:** the `liveness-demo` test from [Milestone 4](M4_LLM_INTEGRATION.md#final-verification-results) remains timing-sensitive. Liveness probes are left out of these scenarios for this reason, so liveness failures are covered only by that test.
 - **Not secured:** there is no login, and the backend uses kind's admin kubeconfig until Milestone 7.
 
+## Why the readiness probe waits
+
+The manifests set `initialDelaySeconds: 10` on the readiness probe. In measurements, nginx took 6 to 8 seconds to answer on this machine. Without the delay, a normal start recorded up to 3 failed probes, even when idle, and the Milestone 3 rule correctly reports 3 recent failures as "may be unstable" for up to 10 minutes.
+
+| Measured over 12 restarts (4 idle, 8 under load) | Restarts with 3 or more failures | Most failures in one restart |
+|---|---|---|
+| Without the delay | 6 of 12 | 3 |
+| With the delay | 0 of 12 | 1 |
+
+The rule itself was not changed, so a pod that really keeps failing is still reported. The delay only moves the first check, and `readiness-probe.yaml` keeps the same delay with its broken path, so its failures are the intended HTTP 404. The cost is that the pod takes about 5 seconds longer to become ready.
+
 ## Troubleshooting
 
 | Symptom | Likely reason | What to do |
 |---|---|---|
 | `namespaces "failure-demo" not found` | The baseline was not applied | Apply `healthy.yaml` first |
 | A fault shows an unexpected diagnosis | Investigated too early | Wait for the symptom in `kubectl`, then investigate again |
+| A healthy pod shows "Readiness of container web may be unstable" | The pod took over about 20 seconds to start, so its readiness probe failed 3 or more times. This should now be rare, because the probe waits 10 seconds first | It clears within 10 minutes. Or close heavy applications and start a new pod with `kubectl --context kind-troubleshooting-lab rollout restart deployment/demo-web -n failure-demo`. See [why the readiness probe waits](#why-the-readiness-probe-waits) |
 | Status stays Not verified after a fix | Investigated during the rollout, or no earlier run found problems | Wait for the rollout, then investigate again. An earlier run must have found problems |
 | The dashboard shows no recovery status | The backend was started before this milestone | Restart the backend |
 | Dashboard reports the cluster unavailable | Docker Desktop or kind is not running | See [Milestone 1](M1_LOCAL_KUBERNETES.md) |
