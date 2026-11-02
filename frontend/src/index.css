@@ -5,6 +5,8 @@
   --border: #cbd2d9;
   --ok: #17693a;
   --error: #b42318;
+  --warn: #8a5a00;
+  --muted: #52606d;
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   line-height: 1.5;
 }
@@ -16,6 +18,8 @@
     --border: #3e4c59;
     --ok: #6fd69a;
     --error: #ff9b8f;
+    --warn: #f0c36d;
+    --muted: #9aa5b1;
   }
 }
 

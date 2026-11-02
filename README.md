@@ -11,11 +11,12 @@ Evidence-based Kubernetes incident investigation and recovery assistant. The ful
 | [M2: Evidence collection](docs/M2_EVIDENCE_COLLECTION.md) | Done |
 | [M3: Deterministic diagnostics](docs/M3_DIAGNOSTICS.md) | Done |
 | [M4: Optional LLM integration](docs/M4_LLM_INTEGRATION.md) | Accepted with documented limitations, not yet run against the real provider |
-| M5 to M10 | Not started |
+| [M5: React dashboard](docs/M5_REACT_DASHBOARD.md) | Done |
+| M6 to M10 | Not started |
 
-**What works today:** a FastAPI backend that reads real resources from a local kind cluster, collects read-only evidence for a namespace, and diagnoses five failure scenarios using deterministic rules. An optional LLM can explain those diagnoses in clearer language, and the project works fully without it. A React page shows backend health.
+**What works today:** a React dashboard investigates a namespace in a real local kind cluster. It shows live progress, a diagnosis of five failure scenarios from deterministic rules, the read-only evidence behind it, and saved history that survives restarts. An optional LLM can explain those diagnoses in clearer language, and the project works fully without it.
 
-**What does not exist yet:** there is no investigation screen and no saved history. The dashboard, Jenkins and monitoring are planned for later milestones. The application suggests fixes but never applies them.
+**What does not exist yet:** recovery verification, least-privilege Kubernetes access, Jenkins and monitoring are planned for later milestones. The application suggests fixes but never applies them.
 
 ## Prerequisites
 
@@ -48,7 +49,10 @@ python -m venv .venv
 | <http://127.0.0.1:8000/api/namespaces/sample-app/evidence> | Live evidence for one namespace |
 | <http://127.0.0.1:8000/api/namespaces/sample-app/diagnosis> | Deterministic diagnosis of one namespace |
 | <http://127.0.0.1:8000/api/namespaces/sample-app/diagnosis?explain=true> | The same, with an optional LLM explanation |
+| <http://127.0.0.1:8000/api/investigations> | Saved investigations |
 | <http://127.0.0.1:8000/docs> | Interactive API docs |
+
+Saved investigations are kept in `backend/data/investigations.db`, which Git ignores.
 
 No API key is needed. To turn on the optional LLM explanations, follow [docs/M4_LLM_INTEGRATION.md](docs/M4_LLM_INTEGRATION.md#set-up).
 
@@ -62,7 +66,7 @@ npm ci
 npm run dev
 ```
 
-Open <http://localhost:5173>. The page shows the live result from the backend, or an error if the backend is not running.
+Open <http://localhost:5173>, enter a namespace such as `sample-app`, and click **Investigate Cluster**. The page shows real results from the backend, or an error if the backend or cluster is not available. See [docs/M5_REACT_DASHBOARD.md](docs/M5_REACT_DASHBOARD.md).
 
 ## Run the checks
 
