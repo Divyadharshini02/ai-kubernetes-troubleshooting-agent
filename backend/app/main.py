@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 
 from app import __version__
 from app.api import cluster, diagnosis, evidence, health, investigations
+from app.kubernetes.cluster import ALLOW_DEFAULT_KUBECONFIG, default_kubeconfig_allowed
 from app.storage.investigations import StorageError, mark_interrupted
 
 logger = logging.getLogger(__name__)
@@ -13,6 +14,8 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    if default_kubeconfig_allowed():
+        logger.warning("%s is on, so the backend may be using administrator credentials", ALLOW_DEFAULT_KUBECONFIG)
     try:
         interrupted = mark_interrupted()
         if interrupted:

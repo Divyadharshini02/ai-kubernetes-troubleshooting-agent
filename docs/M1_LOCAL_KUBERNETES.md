@@ -34,7 +34,7 @@ kubectl rollout status deployment/sample-web -n sample-app --timeout=180s
 
 ## The endpoint
 
-`GET /api/cluster/health` reads the cluster selected by the current kubeconfig context, or by the `KUBECONFIG` environment variable if it is set.
+`GET /api/cluster/health` reads the cluster selected by the kubeconfig in the `KUBECONFIG` environment variable. Since [Milestone 7](M7_RBAC_SECURITY.md), the default kubeconfig is not used unless explicitly allowed.
 
 It reports what the Kubernetes API returned: server version, nodes and pods. It does not decide whether a workload is healthy, because diagnosis belongs to later milestones.
 
@@ -85,7 +85,7 @@ The first command uses real failures where it can: a missing file, a damaged fil
 
 ## Limitations
 
-- **Admin credentials:** the backend uses kind's default kubeconfig, which can do anything in the cluster (`kubectl auth can-i '*' '*'` returns `yes`). The code only sends read requests, but nothing in the cluster enforces that yet. The dedicated read-only ServiceAccount is required by Milestone 7.
+- **Admin credentials:** at this milestone, the backend used kind's default kubeconfig, which can do anything in the cluster. [Milestone 7](M7_RBAC_SECURITY.md) replaced this with a read-only ServiceAccount.
 - **No UI yet:** the React page shows backend health only. It does not call the cluster endpoint.
 - **Single page of results:** lists are not paginated past the 500-item limit.
 

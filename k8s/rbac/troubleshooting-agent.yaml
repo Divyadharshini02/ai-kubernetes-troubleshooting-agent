@@ -1,0 +1,62 @@
+# The backend's own identity. It can read what the collectors use, and nothing else.
+# See docs/M7_RBAC_SECURITY.md. An administrator applies this once.
+#
+# RBAC only grants, so everything not listed here is denied. That includes every write,
+# Secrets, ConfigMaps, pods/exec, pods/attach, pods/portforward and watch.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: troubleshooting-agent
+  labels:
+    app.kubernetes.io/managed-by: troubleshooting-agent-rbac
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: troubleshooting-agent
+  namespace: troubleshooting-agent
+  labels:
+    app.kubernetes.io/managed-by: troubleshooting-agent-rbac
+automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: troubleshooting-agent-reader
+  labels:
+    app.kubernetes.io/managed-by: troubleshooting-agent-rbac
+rules:
+  # Collectors list these. Pods are also listed across namespaces for the cluster overview,
+  # and nodes can only be granted by a ClusterRole because they belong to no namespace.
+  - apiGroups: [""]
+    resources: [events, nodes, persistentvolumeclaims, pods, serviceaccounts, services]
+    verbs: [list]
+  # Each investigation reads one namespace by name and the logs of unhealthy containers.
+  - apiGroups: [""]
+    resources: [namespaces, pods/log]
+    verbs: [get]
+  - apiGroups: [apps]
+    resources: [deployments, replicasets]
+    verbs: [list]
+  - apiGroups: [discovery.k8s.io]
+    resources: [endpointslices]
+    verbs: [list]
+  # Cluster-scoped, like nodes.
+  - apiGroups: [storage.k8s.io]
+    resources: [storageclasses]
+    verbs: [list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: troubleshooting-agent-reader
+  labels:
+    app.kubernetes.io/managed-by: troubleshooting-agent-rbac
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: troubleshooting-agent-reader
+subjects:
+  - kind: ServiceAccount
+    name: troubleshooting-agent
+    namespace: troubleshooting-agent

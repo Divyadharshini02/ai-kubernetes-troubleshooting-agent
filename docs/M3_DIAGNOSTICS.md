@@ -318,5 +318,5 @@ The cluster tests create real failures from [backend/tests/fixtures/evidence-lab
 - **Node capacity:** "insufficient" compares requests with allocatable capacity. Usage by other pods is not collected, so a request that fits a node stays at medium strength.
 - **Quoted text is untrusted:** `excerpt` fields can contain anything a workload wrote. They are redacted and bounded, and the rules never act on them. Milestone 4 must treat them as untrusted.
 - **Redaction is best effort:** see [Milestone 2](M2_EVIDENCE_COLLECTION.md).
-- **Admin credentials:** the backend still uses kind's default kubeconfig until the read-only ServiceAccount in Milestone 7.
+- **Admin credentials:** at this milestone, the backend used kind's default kubeconfig. [Milestone 7](M7_RBAC_SECURITY.md) replaced this with a read-only ServiceAccount.
 - **Not yet built:** diagnoses are not saved, there is no screen for them, and recovery is checked by running the diagnosis again.

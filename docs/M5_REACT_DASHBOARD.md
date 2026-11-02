@@ -104,7 +104,7 @@ So the page cannot show a permanent spinner or a false success.
 - **Namespace suggestions come from pods:** a namespace with no pods is not suggested, but can still be typed.
 - **Interrupted runs:** the startup check is the only recovery. If a database failure stops a run from saving its final status, it stays `running` until the next backend start, and the dashboard stops waiting after 10 minutes.
 - **No frontend tests:** these are verified by lint, build and a browser run. The later pipeline milestone needs frontend tests.
-- **Not secured:** there is no login, and the backend still uses kind's default admin kubeconfig. This is for local use only until Milestone 7.
+- **Not secured:** there is no login, so this is for local use only. Kubernetes access is read-only since [Milestone 7](M7_RBAC_SECURITY.md).
 - **Known test issue:** the `liveness-demo` probe test from [Milestone 4](M4_LLM_INTEGRATION.md#final-verification-results) remains timing-sensitive. It passed in this run, which does not mean it is fixed.
 
 ## Run it

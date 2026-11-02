@@ -1,13 +1,26 @@
 import json
+import os
 import time
 
 import pytest
 from kubernetes import client
 
 from app.collectors.base import CollectorContext
+from app.kubernetes.cluster import default_kubeconfig_allowed
+from lab_harness import ADMIN_KUBECONFIG
 from stub_kube import NAMESPACE, SECRET_VALUE, StubKube
 
 TEST_API_KEY = "test-only-openrouter-key-value"
+
+
+def pytest_runtest_setup(item):
+    """Fail, not skip, so that missing credentials can never look like a pass."""
+    if item.get_closest_marker("cluster") is None:
+        return
+    if not os.environ.get(ADMIN_KUBECONFIG):
+        pytest.fail(f"Cluster tests need {ADMIN_KUBECONFIG}. See docs/M7_RBAC_SECURITY.md.", pytrace=False)
+    if not os.environ.get("KUBECONFIG") and not default_kubeconfig_allowed():
+        pytest.fail("Cluster tests need KUBECONFIG for the backend. See docs/M7_RBAC_SECURITY.md.", pytrace=False)
 
 
 @pytest.fixture(autouse=True)

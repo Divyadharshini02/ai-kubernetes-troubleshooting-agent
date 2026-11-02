@@ -253,7 +253,7 @@ The real protection is the design: the model has no tools, cannot change a diagn
 
 ### This does not make the application fully secure
 
-- **Admin credentials:** the backend still uses kind's default kubeconfig. The read-only ServiceAccount arrives in Milestone 7, so the application should not be called fully secured before then.
+- **Kubernetes access:** [Milestone 7](M7_RBAC_SECURITY.md) gives the backend a read-only ServiceAccount, which has its own [limitations](M7_RBAC_SECURITY.md#security-limitations).
 - **No authentication:** the API has no login, which is acceptable only for local use.
 
 ## Limitations

@@ -434,6 +434,7 @@ def test_missing_kubectl_fails_safely(monkeypatch):
         raise FileNotFoundError("kubectl")
 
     monkeypatch.setattr(subprocess, "run", no_kubectl)
+    monkeypatch.setenv("TEST_ADMIN_KUBECONFIG", "unused-admin-kubeconfig")
 
     with pytest.raises(FileNotFoundError):
         with failure_demo():

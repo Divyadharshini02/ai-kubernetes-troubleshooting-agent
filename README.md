@@ -13,11 +13,14 @@ Evidence-based Kubernetes incident investigation and recovery assistant. The ful
 | [M4: Optional LLM integration](docs/M4_LLM_INTEGRATION.md) | Accepted with documented limitations, not yet run against the real provider |
 | [M5: React dashboard](docs/M5_REACT_DASHBOARD.md) | Done |
 | [M6: Failure scenarios and recovery verification](docs/M6_FAILURE_SCENARIOS.md) | Done |
-| M7 to M10 | Not started |
+| [M7: Kubernetes RBAC and security](docs/M7_RBAC_SECURITY.md) | Done |
+| M8 to M10 | Not started |
 
 **What works today:** a React dashboard investigates a namespace in a real local kind cluster. It shows live progress, a diagnosis of five failure scenarios from deterministic rules, the read-only evidence behind it, and saved history that survives restarts. Reproducible failures in [k8s/scenarios](k8s/scenarios) demonstrate the full lifecycle, and a fresh investigation after a manual fix shows whether earlier problems are still detected. An optional LLM can explain those diagnoses in clearer language, and the project works fully without it.
 
-**What does not exist yet:** least-privilege Kubernetes access, Jenkins and monitoring are planned for later milestones. The application suggests fixes but never applies them.
+The backend uses a dedicated read-only ServiceAccount, so the cluster itself refuses any change. The application suggests fixes but never applies them.
+
+**What does not exist yet:** Jenkins and monitoring are planned for later milestones.
 
 ## Prerequisites
 
@@ -40,8 +43,11 @@ From the repository root, in PowerShell:
 cd backend
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+$env:KUBECONFIG = "$env:USERPROFILE\.kube\troubleshooting-agent.kubeconfig"
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8000
 ```
+
+`KUBECONFIG` must point at the restricted kubeconfig. Create it once, and renew it every 8 hours, by following [docs/M7_RBAC_SECURITY.md](docs/M7_RBAC_SECURITY.md#set-up). Without it, the backend still starts, but its cluster features explain what is missing. It never falls back to administrator credentials unless you [explicitly allow that](docs/M7_RBAC_SECURITY.md#local-development-without-the-restricted-identity).
 
 | URL | Purpose |
 |---|---|
@@ -75,7 +81,9 @@ Open <http://localhost:5173>, enter a namespace such as `sample-app`, and click 
 # From backend/: tests that need no cluster
 .\.venv\Scripts\python.exe -m pytest
 
-# From backend/: tests against the real kind cluster
+# From backend/: tests against the real kind cluster, with the backend restricted
+$env:TEST_ADMIN_KUBECONFIG = "$env:USERPROFILE\.kube\config"
+$env:KUBECONFIG = "$env:USERPROFILE\.kube\troubleshooting-agent.kubeconfig"
 .\.venv\Scripts\python.exe -m pytest -m cluster
 
 # From frontend/

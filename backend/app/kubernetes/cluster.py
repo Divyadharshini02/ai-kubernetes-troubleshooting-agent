@@ -3,6 +3,7 @@
 import logging
 import os
 from datetime import datetime, timezone
+from pathlib import Path
 
 from kubernetes import client, config
 from kubernetes.client.exceptions import ApiException
@@ -15,6 +16,8 @@ logger = logging.getLogger(__name__)
 # (connect, read) seconds for each Kubernetes API request.
 REQUEST_TIMEOUT_SECONDS = (3, 10)
 LIST_LIMIT = 500
+# Local development only. Set to true to allow the default kubeconfig, usually an administrator's.
+ALLOW_DEFAULT_KUBECONFIG = "KUBERNETES_ALLOW_DEFAULT_KUBECONFIG"
 
 
 class ClusterAccessError(Exception):
@@ -39,9 +42,41 @@ def is_tls_failure(exc: ApiException) -> bool:
     return not exc.status and str(exc.reason).startswith("SSLError")
 
 
-def load_configuration() -> tuple[client.Configuration, str]:
+def default_kubeconfig_allowed() -> bool:
+    return os.environ.get(ALLOW_DEFAULT_KUBECONFIG, "").strip().lower() == "true"
+
+
+def _is_default_kubeconfig(config_file: str) -> bool:
+    default = (Path.home() / ".kube" / "config").resolve()
+    return any(Path(path).resolve() == default for path in config_file.split(os.pathsep) if path)
+
+
+def _configured_kubeconfig() -> str | None:
+    """Choose the kubeconfig. The default file normally holds administrator credentials.
+
+    It is therefore only used when explicitly allowed, never as a silent fallback.
+    """
     # The client reads KUBECONFIG once at import, so read it per call instead.
-    config_file = os.environ.get("KUBECONFIG")
+    config_file = os.environ.get("KUBECONFIG") or None
+    if default_kubeconfig_allowed():
+        return config_file
+    if config_file is None:
+        raise ClusterAccessError(
+            "kubeconfig_unavailable",
+            "No restricted Kubernetes credentials are configured. Set KUBECONFIG, as described in "
+            "docs/M7_RBAC_SECURITY.md.",
+        )
+    if _is_default_kubeconfig(config_file):
+        raise ClusterAccessError(
+            "kubeconfig_unavailable",
+            "KUBECONFIG points at the default kubeconfig, which normally holds administrator credentials. "
+            "Use the restricted kubeconfig, as described in docs/M7_RBAC_SECURITY.md.",
+        )
+    return config_file
+
+
+def load_configuration() -> tuple[client.Configuration, str]:
+    config_file = _configured_kubeconfig()
     configuration = client.Configuration()
     # A failed request should fail fast instead of retrying with the default policy.
     configuration.retries = False

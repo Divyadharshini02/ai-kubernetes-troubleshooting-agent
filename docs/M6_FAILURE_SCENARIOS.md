@@ -25,6 +25,7 @@ Deployment rollout failure is not a scenario. Rollout data is collected, but no 
 
 - The kind cluster from [Milestone 1](M1_LOCAL_KUBERNETES.md), with the context `kind-troubleshooting-lab`.
 - The backend and frontend running, as described in the [README](../README.md). A backend started before Milestone 6 must be restarted to pick up the new code.
+- For the live tests, the two settings described in [Milestone 7](M7_RBAC_SECURITY.md#run-the-tests).
 - No LLM or API key.
 
 Every command below names the context, so it cannot reach another cluster by accident.
@@ -126,7 +127,7 @@ The tests apply the same guards automatically, in [failure_scenarios.py](../back
 - **A crash loop needs time.** One restart is deliberately reported as insufficient evidence. It needs at least two.
 - **Recovery compares outcomes.** If one fault is replaced by a different one, the status is Still failing, not "old problem fixed, new problem found".
 - **One known test issue:** the `liveness-demo` test from [Milestone 4](M4_LLM_INTEGRATION.md#final-verification-results) remains timing-sensitive. Liveness probes are left out of these scenarios for this reason, so liveness failures are covered only by that test.
-- **Not secured:** there is no login, and the backend uses kind's admin kubeconfig until Milestone 7.
+- **Not secured:** there is no login, so this is for local use only. Kubernetes access is read-only since [Milestone 7](M7_RBAC_SECURITY.md).
 
 ## Why the readiness probe waits
 
@@ -146,6 +147,7 @@ The rule itself was not changed, so a pod that really keeps failing is still rep
 | `namespaces "failure-demo" not found` | The baseline was not applied | Apply `healthy.yaml` first |
 | A fault shows an unexpected diagnosis | Investigated too early | Wait for the symptom in `kubectl`, then investigate again |
 | A healthy pod shows "Readiness of container web may be unstable" | The pod took over about 20 seconds to start, so its readiness probe failed 3 or more times. This should now be rare, because the probe waits 10 seconds first | It clears within 10 minutes. Or close heavy applications and start a new pod with `kubectl --context kind-troubleshooting-lab rollout restart deployment/demo-web -n failure-demo`. See [why the readiness probe waits](#why-the-readiness-probe-waits) |
+| The dashboard reports that no restricted credentials are configured | `KUBECONFIG` is not set for the backend | Follow [Milestone 7 set-up](M7_RBAC_SECURITY.md#set-up) |
 | Status stays Not verified after a fix | Investigated during the rollout, or no earlier run found problems | Wait for the rollout, then investigate again. An earlier run must have found problems |
 | The dashboard shows no recovery status | The backend was started before this milestone | Restart the backend |
 | Dashboard reports the cluster unavailable | Docker Desktop or kind is not running | See [Milestone 1](M1_LOCAL_KUBERNETES.md) |

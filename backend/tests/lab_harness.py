@@ -7,18 +7,21 @@ Cleanup guarantees:
 - A hard kill cannot run cleanup, so every new lab first removes any leftover one.
 - Removal is verified, and a failure to remove the lab raises an error.
 
-Safety guards, both checked before anything is written:
+Safety guards, all checked before anything is written:
+- Writes use the kubeconfig in TEST_ADMIN_KUBECONFIG, never the backend's in KUBECONFIG.
 - The current kubeconfig context must be the local kind cluster.
 - An existing namespace is only removed if it carries this harness's label.
 """
 
 import json
+import os
 import subprocess
 from contextlib import contextmanager
 from pathlib import Path
 
 LAB_NAMESPACE = "evidence-lab"
 LAB_CONTEXT = "kind-troubleshooting-lab"
+ADMIN_KUBECONFIG = "TEST_ADMIN_KUBECONFIG"
 OWNER_LABEL = "app.kubernetes.io/managed-by"
 OWNER_VALUE = "evidence-lab-tests"
 MANIFEST = Path(__file__).parent / "fixtures" / "evidence-lab.yaml"
@@ -33,10 +36,21 @@ class LabCleanupError(Exception):
     """The lab namespace could not be removed."""
 
 
+def admin_kubeconfig() -> str:
+    """The kubeconfig for the harnesses' writes, which must never be the backend's identity."""
+    admin = os.environ.get(ADMIN_KUBECONFIG)
+    if not admin:
+        raise LabSafetyError(f"Set {ADMIN_KUBECONFIG} to an administrator kubeconfig. Nothing was changed.")
+    backend = os.environ.get("KUBECONFIG")
+    if backend and Path(backend).resolve() == Path(admin).resolve():
+        raise LabSafetyError(f"{ADMIN_KUBECONFIG} and KUBECONFIG are the same file. Nothing was changed.")
+    return admin
+
+
 def run_kubectl(*args: str) -> str:
     # Every lab command names the context, so a later context switch cannot redirect it.
     result = subprocess.run(
-        ["kubectl", "--context", LAB_CONTEXT, *args],
+        ["kubectl", "--kubeconfig", admin_kubeconfig(), "--context", LAB_CONTEXT, *args],
         check=True,
         capture_output=True,
         text=True,
@@ -47,7 +61,7 @@ def run_kubectl(*args: str) -> str:
 
 def current_context() -> str:
     result = subprocess.run(
-        ["kubectl", "config", "current-context"],
+        ["kubectl", "--kubeconfig", admin_kubeconfig(), "config", "current-context"],
         check=True,
         capture_output=True,
         text=True,

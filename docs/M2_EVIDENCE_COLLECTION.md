@@ -170,7 +170,7 @@ Results from 2026-11-01:
 
 ## Limitations
 
-- **Admin credentials:** the backend still uses kind's default kubeconfig. The code only reads, but nothing in the cluster enforces that until the read-only ServiceAccount in Milestone 7. `forbidden` handling has only been tested against a stub API, not real RBAC.
+- **Admin credentials:** at this milestone, the backend used kind's default kubeconfig. [Milestone 7](M7_RBAC_SECURITY.md) replaced this with a read-only ServiceAccount, and also tested `forbidden` handling against real RBAC.
 - **No live application checks:** probes are reported from configuration and events. The application is not called directly, because that needs pod exec or the API proxy.
 - **No direct registry check:** registry access evidence comes from image pull events.
 - **Node requests are not totalled:** pods in other namespaces are not read, so per-node usage is not calculated. The scheduler's events report insufficient resources.
