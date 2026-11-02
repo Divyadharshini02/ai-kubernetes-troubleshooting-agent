@@ -4,6 +4,9 @@ The file holds only the API server address, its public CA and the token. The tok
 printed, and the administrator's client key is never copied. See docs/M7_RBAC_SECURITY.md.
 
 Run with: backend\\.venv\\Scripts\\python.exe scripts\\new_readonly_kubeconfig.py
+
+With --container, it writes the copy for the Compose backend instead, which reaches the API
+server over the kind network. See docs/M8_DOCKER_JENKINS_TRIVY.md.
 """
 
 import argparse
@@ -22,6 +25,10 @@ TOKEN_DURATION = "8h"
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_ADMIN = Path.home() / ".kube" / "config"
 DEFAULT_OUTPUT = Path.home() / ".kube" / "troubleshooting-agent.kubeconfig"
+# In its own folder, because the whole folder is mounted so that a renewed token is seen.
+DEFAULT_CONTAINER_OUTPUT = Path.home() / ".kube" / "troubleshooting-agent-container" / "kubeconfig"
+# The API server's certificate covers this name, and it resolves on the kind network.
+CONTAINER_SERVER = "https://troubleshooting-lab-control-plane:6443"
 RBAC_MANIFEST = "k8s/rbac/troubleshooting-agent.yaml"
 
 
@@ -33,12 +40,15 @@ def run_kubectl(*args: str) -> subprocess.CompletedProcess:
     return subprocess.run(["kubectl", *args], capture_output=True, text=True, timeout=60)
 
 
-def _check_output_path(output: Path, admin: Path) -> None:
+def _check_output_path(output: Path, admin: Path, for_container: bool) -> None:
     resolved = output.resolve()
     if resolved.is_relative_to(REPO_ROOT):
         raise ScriptError(f"Refusing to write credentials inside the repository: {resolved}")
     if resolved in (admin.resolve(), DEFAULT_ADMIN.resolve()):
         raise ScriptError(f"Refusing to overwrite an administrator kubeconfig: {resolved}")
+    # The container's folder is mounted whole, so it must never hold an administrator's file.
+    if for_container and resolved.parent in (admin.resolve().parent, DEFAULT_ADMIN.resolve().parent):
+        raise ScriptError(f"Refusing to use the folder of an administrator kubeconfig: {resolved.parent}")
 
 
 def _kubeconfig(server: str, certificate_authority: str, token: str) -> dict:
@@ -89,9 +99,13 @@ def _verify_restricted(path: str, run) -> None:
         raise ScriptError("The new token has more access than it should, so it was not saved.")
 
 
-def create_kubeconfig(output: Path, admin: Path, run=run_kubectl) -> str:
-    """Write the kubeconfig and return when its token expires."""
-    _check_output_path(output, admin)
+def create_kubeconfig(output: Path, admin: Path, run=run_kubectl, saved_server: str | None = None) -> str:
+    """Write the kubeconfig and return when its token expires.
+
+    The token is always checked through the address this machine can reach. With saved_server,
+    the file then gets that address instead, for a client somewhere this machine is not.
+    """
+    _check_output_path(output, admin, for_container=saved_server is not None)
 
     def admin_call(*args: str) -> subprocess.CompletedProcess:
         return run("--kubeconfig", str(admin), *args)
@@ -114,6 +128,9 @@ def create_kubeconfig(output: Path, admin: Path, run=run_kubectl) -> str:
         with os.fdopen(descriptor, "w", encoding="utf-8") as file:
             json.dump(_kubeconfig(server, certificate_authority, token), file)
         _verify_restricted(temporary, run)
+        if saved_server:
+            with open(temporary, "w", encoding="utf-8") as file:
+                json.dump(_kubeconfig(saved_server, certificate_authority, token), file)
         os.replace(temporary, output)
     finally:
         if os.path.exists(temporary):
@@ -123,11 +140,14 @@ def create_kubeconfig(output: Path, admin: Path, run=run_kubectl) -> str:
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="Create or renew the backend's restricted kubeconfig.")
-    parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument("--output", type=Path)
     parser.add_argument("--admin-kubeconfig", type=Path, default=DEFAULT_ADMIN)
+    parser.add_argument("--container", action="store_true", help="write the copy for the Compose backend")
     args = parser.parse_args(argv)
+    output = args.output or (DEFAULT_CONTAINER_OUTPUT if args.container else DEFAULT_OUTPUT)
+    options = {"saved_server": CONTAINER_SERVER} if args.container else {}
     try:
-        expires_at = create_kubeconfig(args.output, args.admin_kubeconfig)
+        expires_at = create_kubeconfig(output, args.admin_kubeconfig, **options)
     except ScriptError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
@@ -137,9 +157,12 @@ def main(argv=None) -> int:
     except subprocess.TimeoutExpired:
         print("Error: kubectl did not respond in time.", file=sys.stderr)
         return 1
-    print(f"Wrote {args.output}")
+    print(f"Wrote {output}")
     print(f"The token expires at {expires_at}. Run this script again to renew it, with no backend restart.")
-    print(f'Start the backend with: $env:KUBECONFIG = "{args.output}"')
+    if args.container:
+        print("Start the backend with: docker compose up -d")
+    else:
+        print(f'Start the backend with: $env:KUBECONFIG = "{output}"')
     return 0
 
 

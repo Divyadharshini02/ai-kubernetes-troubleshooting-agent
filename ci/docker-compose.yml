@@ -1,0 +1,72 @@
+# Jenkins and its own Docker daemon, at http://localhost:8090. See docs/M8_DOCKER_JENKINS_TRIVY.md.
+#
+# Pipelines build and run containers in ci-docker, so they cannot see or change anything on the
+# host's Docker. Jenkins gets no kubeconfig, is not on the kind network, and is reachable only
+# from this machine. The host's Docker socket is never mounted.
+name: troubleshooting-ci
+
+services:
+  ci-docker:
+    image: docker:29-dind@sha256:9e79b879b177fbd72c34376a3dd3d91747da5db49e1f560f76aea59561471977
+    container_name: ci-docker
+    # A separate daemon needs this. It protects against mistakes, but it is not a security
+    # boundary against malicious code, which is why this builds only this repository.
+    privileged: true
+    environment:
+      DOCKER_TLS_CERTDIR: /certs
+    volumes:
+      - ci-docker-data:/var/lib/docker
+      - ci-docker-certs:/certs/client
+      # The same path as in Jenkins, so that build containers can mount the workspace.
+      - jenkins-home:/var/jenkins_home
+    networks:
+      ci:
+        aliases:
+          - docker
+    healthcheck:
+      test: ["CMD", "docker", "info"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+    mem_limit: 3g
+    cpus: 2.0
+
+  jenkins:
+    build: ./jenkins
+    image: troubleshooting-ci-jenkins:local
+    container_name: ci-jenkins
+    depends_on:
+      ci-docker:
+        condition: service_healthy
+    environment:
+      DOCKER_HOST: tcp://docker:2376
+      DOCKER_CERT_PATH: /certs/client
+      DOCKER_TLS_VERIFY: "1"
+      CASC_JENKINS_CONFIG: /usr/share/jenkins/casc.yaml
+      # There is no Git remote, so the job clones this mounted repository, which the plugin blocks by default.
+      JAVA_OPTS: -Xmx512m -Djenkins.install.runSetupWizard=false -Dhudson.plugins.git.GitSCM.ALLOW_LOCAL_CHECKOUT=true
+    ports:
+      - "127.0.0.1:8090:8080"
+    volumes:
+      - jenkins-home:/var/jenkins_home
+      - ci-docker-certs:/certs/client:ro
+      # Only .git, so Jenkins sees committed files and never .venv, .env or the database.
+      - ../.git:/repo.git:ro
+    secrets:
+      - jenkins_admin_password
+    networks:
+      - ci
+    mem_limit: 1200m
+    cpus: 1.0
+
+secrets:
+  jenkins_admin_password:
+    file: ${USERPROFILE:?USERPROFILE must be set}/.troubleshooting-ci/admin-password
+
+volumes:
+  ci-docker-data:
+  ci-docker-certs:
+  jenkins-home:
+
+networks:
+  ci:

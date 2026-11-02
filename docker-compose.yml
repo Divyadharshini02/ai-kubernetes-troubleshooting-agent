@@ -1,0 +1,42 @@
+# The application in containers, at http://localhost:8088. See docs/M8_DOCKER_JENKINS_TRIVY.md.
+# First run: backend\.venv\Scripts\python.exe scripts\new_readonly_kubeconfig.py --container
+name: troubleshooting-agent
+
+services:
+  backend:
+    build: ./backend
+    image: troubleshooting-agent-backend:local
+    environment:
+      KUBECONFIG: /run/agent-kube/kubeconfig
+    volumes:
+      # Only this folder, which holds only the restricted kubeconfig. Never ~/.kube itself.
+      - ${USERPROFILE:?USERPROFILE must be set}/.kube/troubleshooting-agent-container:/run/agent-kube:ro
+      - agent-data:/app/data
+    networks:
+      - app
+      # The API server can only be reached by name from this network.
+      - kind
+    mem_limit: 384m
+    cpus: 1.0
+    # Not published. It is reached only through the frontend.
+
+  frontend:
+    build: ./frontend
+    image: troubleshooting-agent-frontend:local
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8088:8080"
+    networks:
+      - app
+    mem_limit: 64m
+    cpus: 0.25
+
+volumes:
+  agent-data:
+
+networks:
+  app:
+  kind:
+    external: true

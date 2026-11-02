@@ -50,7 +50,7 @@ The token lasts 8 hours. When it expires, the dashboard reports that the API rej
 backend\.venv\Scripts\python.exe scripts\new_readonly_kubeconfig.py
 ```
 
-No backend restart is needed, because the kubeconfig is read on every request. If renewal fails, the existing file is left as it was.
+No backend restart is needed, because the kubeconfig is read on every request. If renewal fails, the existing file is left as it was. The backend in Docker uses its own copy, created with `--container`, as described in [Milestone 8](M8_DOCKER_JENKINS_TRIVY.md#run-the-application).
 
 ## What the script guarantees
 

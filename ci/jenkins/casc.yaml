@@ -1,0 +1,42 @@
+# Jenkins configuration as code. The password comes from a Compose secret, never from this file.
+jenkins:
+  numExecutors: 1
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: admin
+          password: ${jenkins_admin_password}
+  authorizationStrategy:
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: false
+
+unclassified:
+  location:
+    url: http://localhost:8090/
+
+jobs:
+  - script: >
+      pipelineJob('troubleshooting-agent') {
+        description('Tests, builds and scans this repository. Nothing is published.')
+        parameters {
+          stringParam('BRANCH', 'main', 'The local branch to build.')
+        }
+        logRotator {
+          numToKeep(20)
+        }
+        definition {
+          cpsScm {
+            scm {
+              git {
+                remote {
+                  url('file:///repo.git')
+                }
+                branch('$BRANCH')
+              }
+            }
+            scriptPath('Jenkinsfile')
+            lightweight(false)
+          }
+        }
+      }

@@ -1,0 +1,12 @@
+# Only what the build needs is allowed in, so node_modules, dist, .env files and anything new
+# stay out unless they are listed here.
+*
+!index.html
+!nginx.conf
+!package.json
+!package-lock.json
+!public
+!src
+!vite.config.js
+**/.env*
+**/*.kubeconfig

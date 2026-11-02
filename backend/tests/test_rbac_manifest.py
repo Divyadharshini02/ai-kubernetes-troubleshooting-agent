@@ -132,7 +132,7 @@ def test_missing_credentials_are_a_saved_investigation_failure(no_credentials, r
     assert saved["error"]["code"] == "kubeconfig_unavailable"
 
 
-@pytest.mark.parametrize("variant", ["config", ".\\config", "other{sep}config"])
+@pytest.mark.parametrize("variant", ["config", f".{cluster.os.sep}config", "other{sep}config"])
 def test_kubeconfig_naming_the_default_file_is_refused(no_credentials, real_loader_must_not_run, monkeypatch, tmp_path, variant):
     home = tmp_path / "home"
     (home / ".kube").mkdir(parents=True)
@@ -407,6 +407,83 @@ def test_refuses_to_overwrite_the_admin_kubeconfig(tmp_path):
 
     assert admin.read_text() == "admin credentials"
     assert kubectl.calls == []
+
+
+def test_default_mode_keeps_the_address_this_machine_can_reach(paths):
+    output, admin = paths
+
+    script.create_kubeconfig(output, admin, FakeKubectl())
+
+    assert json.loads(output.read_text())["clusters"][0]["cluster"]["server"] == "https://127.0.0.1:1234"
+
+
+def test_container_mode_saves_the_internal_address_but_verifies_through_the_reachable_one(paths):
+    output, admin = paths
+    verified_through = []
+    kubectl = FakeKubectl()
+
+    def run(*args):
+        if "can-i" in args:
+            verified_through.append(json.loads(Path(args[1]).read_text())["clusters"][0]["cluster"]["server"])
+        return kubectl(*args)
+
+    script.create_kubeconfig(output, admin, run, saved_server=script.CONTAINER_SERVER)
+
+    saved = json.loads(output.read_text())
+    assert set(verified_through) == {"https://127.0.0.1:1234"}
+    assert saved["clusters"][0]["cluster"] == {"server": script.CONTAINER_SERVER, "certificate-authority-data": "public-ca"}
+    assert saved["users"] == [{"name": "troubleshooting-agent", "user": {"token": TOKEN}}]
+    assert ADMIN_KEY not in output.read_text()
+    assert [path.name for path in output.parent.iterdir()] == [output.name]
+
+
+def test_container_mode_keeps_every_other_guard(paths):
+    output, admin = paths
+
+    with pytest.raises(script.ScriptError):
+        script.create_kubeconfig(output, admin, FakeKubectl(can={"secrets": "yes"}), saved_server=script.CONTAINER_SERVER)
+
+    assert list(output.parent.iterdir()) == []
+
+
+def test_container_mode_refuses_the_folder_of_the_admin_kubeconfig(tmp_path):
+    # That folder is mounted whole, which would hand the administrator's file to the container.
+    kubectl = FakeKubectl()
+    admin = tmp_path / "kube" / "config"
+    admin.parent.mkdir()
+
+    with pytest.raises(script.ScriptError):
+        script.create_kubeconfig(admin.parent / "kubeconfig", admin, kubectl, saved_server=script.CONTAINER_SERVER)
+
+    assert kubectl.calls == []
+    assert list(admin.parent.iterdir()) == []
+
+
+def test_container_mode_refuses_the_repository(tmp_path):
+    with pytest.raises(script.ScriptError):
+        script.create_kubeconfig(REPO / "kubeconfig", tmp_path / "admin", FakeKubectl(), saved_server=script.CONTAINER_SERVER)
+
+
+@pytest.mark.parametrize(
+    ("flags", "expected_server"),
+    [([], None), (["--container"], script.CONTAINER_SERVER)],
+)
+def test_the_command_line_selects_the_mode(paths, monkeypatch, capsys, flags, expected_server):
+    output, admin = paths
+    real = script.create_kubeconfig
+    monkeypatch.setattr(script, "create_kubeconfig", lambda o, a, **options: real(o, a, FakeKubectl(), **options))
+
+    assert script.main(["--output", str(output), "--admin-kubeconfig", str(admin), *flags]) == 0
+
+    server = json.loads(output.read_text())["clusters"][0]["cluster"]["server"]
+    assert server == (expected_server or "https://127.0.0.1:1234")
+    assert TOKEN not in capsys.readouterr().out
+
+
+def test_container_default_output_is_alone_in_its_folder_and_outside_the_repository():
+    assert script.DEFAULT_CONTAINER_OUTPUT.parent != script.DEFAULT_ADMIN.parent
+    assert script.DEFAULT_CONTAINER_OUTPUT.parent != script.DEFAULT_OUTPUT.parent
+    assert not script.DEFAULT_CONTAINER_OUTPUT.resolve().is_relative_to(REPO)
 
 
 def test_missing_kubectl_is_a_clean_error(paths, monkeypatch, capsys):

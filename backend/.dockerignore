@@ -1,0 +1,11 @@
+# Only what the image needs is allowed in. Anything new stays out unless it is listed here,
+# so tests, .env files, kubeconfigs, the database and .venv can never reach an image.
+*
+!app
+!requirements.txt
+**/__pycache__
+**/*.py[cod]
+**/.env*
+**/*.kubeconfig
+**/*.db
+**/*.db-journal

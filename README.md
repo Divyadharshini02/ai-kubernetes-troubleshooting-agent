@@ -14,13 +14,16 @@ Evidence-based Kubernetes incident investigation and recovery assistant. The ful
 | [M5: React dashboard](docs/M5_REACT_DASHBOARD.md) | Done |
 | [M6: Failure scenarios and recovery verification](docs/M6_FAILURE_SCENARIOS.md) | Done |
 | [M7: Kubernetes RBAC and security](docs/M7_RBAC_SECURITY.md) | Done |
-| M8 to M10 | Not started |
+| [M8: Docker, Jenkins CI/CD and Trivy](docs/M8_DOCKER_JENKINS_TRIVY.md) | M8 completed |
+| M9 to M10 | Not started |
 
 **What works today:** a React dashboard investigates a namespace in a real local kind cluster. It shows live progress, a diagnosis of five failure scenarios from deterministic rules, the read-only evidence behind it, and saved history that survives restarts. Reproducible failures in [k8s/scenarios](k8s/scenarios) demonstrate the full lifecycle, and a fresh investigation after a manual fix shows whether earlier problems are still detected. An optional LLM can explain those diagnoses in clearer language, and the project works fully without it.
 
 The backend uses a dedicated read-only ServiceAccount, so the cluster itself refuses any change. The application suggests fixes but never applies them.
 
-**What does not exist yet:** Jenkins and monitoring are planned for later milestones.
+The application also runs in Docker, and a local Jenkins pipeline tests, builds and scans it with Trivy. Nothing is published.
+
+**What does not exist yet:** monitoring is planned for a later milestone.
 
 ## Prerequisites
 
@@ -75,10 +78,15 @@ npm run dev
 
 Open <http://localhost:5173>, enter a namespace such as `sample-app`, and click **Investigate Cluster**. The page shows real results from the backend, or an error if the backend or cluster is not available. See [docs/M5_REACT_DASHBOARD.md](docs/M5_REACT_DASHBOARD.md).
 
+## Run it in Docker
+
+To run the application in containers, at <http://localhost:8088>, or the Jenkins pipeline, at <http://localhost:8090>, follow [docs/M8_DOCKER_JENKINS_TRIVY.md](docs/M8_DOCKER_JENKINS_TRIVY.md).
+
 ## Run the checks
 
 ```powershell
-# From backend/: tests that need no cluster
+# From backend/: lint, and tests that need no cluster
+.\.venv\Scripts\ruff.exe check app tests ..\scripts
 .\.venv\Scripts\python.exe -m pytest
 
 # From backend/: tests against the real kind cluster, with the backend restricted
