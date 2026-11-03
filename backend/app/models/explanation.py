@@ -27,6 +27,9 @@ ExplanationReason = Literal[
     "limit_reached",
     "time_budget_exhausted",
     "unexpected_error",
+    "model_not_free",
+    "non_free_model",
+    "budget_exhausted",
 ]
 
 

@@ -5,6 +5,7 @@ import time
 import pytest
 from kubernetes import client
 
+from app.agent.budget import BUDGET
 from app.collectors.base import CollectorContext
 from app.kubernetes.cluster import default_kubeconfig_allowed
 from lab_harness import ADMIN_KUBECONFIG
@@ -35,6 +36,9 @@ def no_real_llm_calls(monkeypatch):
     monkeypatch.setenv("OPENROUTER_BASE_URL", "http://127.0.0.1:9/api/v1")
     monkeypatch.setenv("LLM_TIMEOUT_SECONDS", "5")
     monkeypatch.setenv("LLM_MAX_RETRIES", "1")
+    # Each test starts with an unused local request budget, at the highest allowed rate.
+    monkeypatch.setenv("LLM_MAX_REQUESTS_PER_MINUTE", "20")
+    BUDGET.reset()
 
 
 @pytest.fixture

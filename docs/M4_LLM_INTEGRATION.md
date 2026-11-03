@@ -60,7 +60,7 @@ To turn it off, set `LLM_ENABLED=false`. Settings are read on each request, so a
 | `OPENROUTER_API_KEY` | Empty | Your key. Server side only |
 | `OPENROUTER_MODEL` | Empty | Model to use. Nothing is hardcoded |
 | `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | Must be HTTPS, except on the local machine |
-| `LLM_TIMEOUT_SECONDS` | `20` | Per attempt, from above 0 up to 60 |
+| `LLM_TIMEOUT_SECONDS` | `20` | Per attempt, from above 0 up to 120 (60 before [Milestone 10](M10_AI_AGENT.md)) |
 | `LLM_MAX_RETRIES` | `1` | Retries for temporary failures, from 0 to 3 |
 
 Invalid settings do not stop the backend or lose a diagnosis. The explanation reports `invalid_configuration`, and the log names the setting but not its value.
@@ -75,7 +75,6 @@ On 2026-11-01, OpenRouter's public catalogue listed these free models with struc
 |---|---|
 | `nvidia/nemotron-3.5-super-vl:free` | The example used here |
 | `liquid/lfm-2.5-2.6b:free` | Smaller alternative |
-| `openrouter/free` | Routes to an available free model, so the model can vary |
 
 Free models change often, so check the current list:
 
@@ -85,7 +84,7 @@ Free models change often, so check the current list:
   Select-Object -ExpandProperty id
 ```
 
-Some free listings are not text models, so check a model's page before relying on it. Nothing in the code stops a paid model from being configured, so check the price if you change this.
+Some free listings are not text models, so check a model's page before relying on it. Since [Milestone 10](M10_AI_AGENT.md#free-models-only), only model IDs ending in `:free` are accepted, and a response not confirmed as free is not used.
 
 ## The API
 

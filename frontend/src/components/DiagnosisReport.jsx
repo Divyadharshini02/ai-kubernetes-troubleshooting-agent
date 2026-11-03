@@ -116,7 +116,8 @@ const RECOVERY_TEXT = {
 }
 
 function aiStatusText(investigation) {
-  const llm = investigation.report?.llm
+  // Investigations from Milestone 10 on carry one analysis. Older ones carry per-diagnosis explanations.
+  const llm = investigation.report?.ai_analysis ?? investigation.report?.llm
   if (!investigation.explain_requested || !llm) {
     return 'Not requested'
   }

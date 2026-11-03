@@ -10,4 +10,11 @@ export default defineConfig({
       '/api': 'http://127.0.0.1:8000',
     },
   },
+  test: {
+    // A simulated browser, so components render without a real one. Tests never reach the backend.
+    environment: 'jsdom',
+    include: ['src/**/*.test.jsx'],
+    // The default 5 seconds was exceeded by the first render on this machine while other containers ran.
+    testTimeout: 20000,
+  },
 })

@@ -191,6 +191,100 @@ pre {
   border-radius: 4px;
 }
 
+/* Generated content is always visibly set apart from the deterministic diagnosis. */
+.ai-panel {
+  border-style: dashed;
+}
+
+.ai-label {
+  padding: 4px 8px;
+  border-left: 3px solid var(--warn);
+  font-size: 0.9rem;
+}
+
+.evidence-id {
+  display: inline-block;
+  margin: 2px 4px 2px 0;
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+
+.kind-hypothesis,
+.risk-medium {
+  color: var(--warn);
+}
+
+.kind-confirmed,
+.risk-low {
+  color: var(--ok);
+}
+
+.risk-high {
+  color: var(--error);
+}
+
+.remediation li {
+  margin-bottom: 12px;
+}
+
+.chat-messages {
+  display: grid;
+  gap: 8px;
+}
+
+.chat-message {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.chat-message.user {
+  margin-left: 15%;
+}
+
+.chat-message.assistant {
+  margin-right: 15%;
+  border-style: dashed;
+}
+
+.chat-message p {
+  margin: 4px 0;
+}
+
+textarea {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 8px;
+  font: inherit;
+  resize: vertical;
+}
+
+.chat-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+
+.follow-ups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.link-button {
+  font-size: 0.85rem;
+}
+
+@media (max-width: 800px) {
+  .chat-message.user,
+  .chat-message.assistant {
+    margin-left: 0;
+    margin-right: 0;
+  }
+}
+
 .evidence li {
   padding: 4px 0;
   border-bottom: 1px solid var(--border);

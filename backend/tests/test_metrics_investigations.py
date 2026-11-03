@@ -9,12 +9,12 @@ import pytest
 from fastapi.testclient import TestClient
 from prometheus_client import REGISTRY
 
-from app.agent import explainer
+from app.agent import analysis, explainer
 from app.main import app
 from app.observability import metrics
 from app.services import investigations as service
 from app.storage import investigations as storage
-from llm_factory import COMPLETIONS_PATH, completion, valid_content
+from llm_factory import COMPLETIONS_PATH, completion, valid_rca
 from stub_kube import NAMESPACE, SECRET_VALUE, container_status, list_of, make_pod, namespace_routes, pod_log_path
 from test_cluster_health import VERSION
 
@@ -30,6 +30,7 @@ EVIDENCE = "troubleshooting_evidence_collector_failures_total"
 LLM_COUNT = "troubleshooting_llm_request_duration_seconds_count"
 LLM_ERRORS = "troubleshooting_llm_request_errors_total"
 LLM_EXPLANATIONS = "troubleshooting_llm_explanations_total"
+AI_ANALYSES = "troubleshooting_ai_analyses_total"
 
 
 @pytest.fixture(autouse=True)
@@ -84,6 +85,7 @@ class Counts:
                     "troubleshooting_recovery",
                     "troubleshooting_evidence",
                     "troubleshooting_llm",
+                    "troubleshooting_ai",
                 )
             )
             and "_bucket" not in family_sample.name
@@ -336,7 +338,7 @@ def test_a_disabled_llm_is_one_fallback_and_no_provider_attempt(cluster):
 
     assert investigation["ai_reason"] == "disabled"
     changes = counts.changes()
-    assert changes[key(LLM_EXPLANATIONS, status="unavailable", reason="disabled")] == 1
+    assert changes[key(AI_ANALYSES, status="unavailable", reason="disabled")] == 1
     assert key(LLM_COUNT) not in changes
 
 
@@ -348,8 +350,9 @@ def test_no_explanation_request_records_nothing_about_the_llm(cluster):
     assert not [name for (name, _labels) in counts.changes() if name.startswith("troubleshooting_llm")]
 
 
-def test_a_generated_explanation_is_one_attempt_and_no_fallback(cluster, llm):
-    llm.routes[COMPLETIONS_PATH] = (200, completion(valid_content()))
+def test_a_generated_analysis_is_one_attempt_and_no_fallback(cluster, llm):
+    cited = [r["evidence_id"] for r in investigate()["report"]["diagnoses"][0]["evidence_references"]]
+    llm.routes[COMPLETIONS_PATH] = (200, completion(valid_rca(cited)))
     counts = Counts()
 
     investigation = investigate(explain=True)
@@ -357,11 +360,13 @@ def test_a_generated_explanation_is_one_attempt_and_no_fallback(cluster, llm):
     assert investigation["ai_status"] == "generated"
     changes = counts.changes()
     assert changes[key(LLM_COUNT)] == 1
-    assert changes[key(LLM_EXPLANATIONS, status="generated", reason="none")] == 1
-    assert not [name for (name, _labels) in changes if name == LLM_ERRORS]
+    assert changes[key(AI_ANALYSES, status="generated", reason="none")] == 1
+    assert not [name for (name, _labels) in changes if name in (LLM_ERRORS, LLM_EXPLANATIONS)]
 
 
-def test_retries_are_separate_attempts_but_one_fallback(cluster, llm, monkeypatch):
+def test_a_failed_analysis_is_one_attempt_and_one_fallback(cluster, llm, monkeypatch):
+    # Retries are allowed in the settings, but an analysis makes one request and then falls back.
+    monkeypatch.setenv("LLM_MAX_RETRIES", "3")
     monkeypatch.setattr(explainer, "RETRY_DELAY_SECONDS", 0)
     llm.routes[COMPLETIONS_PATH] = (500, {"error": {"code": 500, "message": "provider detail"}})
     counts = Counts()
@@ -369,11 +374,11 @@ def test_retries_are_separate_attempts_but_one_fallback(cluster, llm, monkeypatc
     investigation = investigate(explain=True)
 
     assert investigation["ai_reason"] == "provider_error"
-    assert len(llm.requests) == 2
+    assert len(llm.requests) == 1
     changes = counts.changes()
-    assert changes[key(LLM_COUNT)] == 2
-    assert changes[key(LLM_ERRORS, reason="provider_error")] == 2
-    assert changes[key(LLM_EXPLANATIONS, status="unavailable", reason="provider_error")] == 1
+    assert changes[key(LLM_COUNT)] == 1
+    assert changes[key(LLM_ERRORS, reason="provider_error")] == 1
+    assert changes[key(AI_ANALYSES, status="unavailable", reason="provider_error")] == 1
     # The investigation itself still completed, and only once.
     assert changes[key(INVESTIGATIONS, status="completed", outcome="problems_found")] == 1
 
@@ -388,7 +393,7 @@ def test_a_rejected_answer_is_a_fallback_but_not_a_failed_request(cluster, llm):
     changes = counts.changes()
     assert changes[key(LLM_COUNT)] == 1
     assert not [name for (name, _labels) in changes if name == LLM_ERRORS]
-    assert changes[key(LLM_EXPLANATIONS, status="unavailable", reason=investigation["ai_reason"])] == 1
+    assert changes[key(AI_ANALYSES, status="unavailable", reason=investigation["ai_reason"])] == 1
 
 
 def test_the_diagnosis_endpoint_counts_its_explanation_once_and_no_investigation(cluster):
@@ -400,17 +405,17 @@ def test_the_diagnosis_endpoint_counts_its_explanation_once_and_no_investigation
     assert counts.changes() == {key(LLM_EXPLANATIONS, status="unavailable", reason="disabled"): 1}
 
 
-def test_an_unexpected_explainer_fault_is_one_fallback(cluster, monkeypatch):
+def test_an_unexpected_analysis_fault_is_one_fallback(cluster, monkeypatch):
     def broken(*_args):
         raise RuntimeError("unexpected")
 
-    monkeypatch.setattr(explainer, "_build_report", broken)
+    monkeypatch.setattr(analysis, "_analyze", broken)
     counts = Counts()
 
     investigation = investigate(explain=True)
 
     assert investigation["status"] == "completed"
-    assert counts.changes()[key(LLM_EXPLANATIONS, status="unavailable", reason="unexpected_error")] == 1
+    assert counts.changes()[key(AI_ANALYSES, status="unavailable", reason="unexpected_error")] == 1
 
 
 def test_run_investigation_itself_records_once(cluster):

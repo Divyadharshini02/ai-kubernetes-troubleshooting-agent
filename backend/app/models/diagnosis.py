@@ -3,6 +3,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+from app.models.analysis import AiAnalysis
 from app.models.evidence import CollectionStatus, EvidenceBundle, Temporality
 from app.models.explanation import LlmReport
 
@@ -122,4 +123,7 @@ class DiagnosticReport(BaseModel):
     # Present only when requested, so references can be followed to the evidence itself.
     evidence: EvidenceBundle | None = None
     # Present only when an explanation was requested. Everything above is deterministic.
+    # Per-diagnosis explanations, from the diagnosis endpoint and investigations saved before Milestone 10.
     llm: LlmReport | None = None
+    # One root cause analysis per investigation, from Milestone 10 on.
+    ai_analysis: AiAnalysis | None = None

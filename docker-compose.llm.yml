@@ -1,0 +1,22 @@
+# Optional: adds the LLM to the containerized application. See docs/M10_AI_AGENT.md.
+#   docker compose -f docker-compose.yml -f docker-compose.llm.yml up -d --build --wait
+# Without this file, the application runs with deterministic diagnosis only and needs no key.
+#
+# The key is a secret file outside the repository, mounted at /run/secrets/openrouter_api_key.
+# It is never an environment variable, so it does not appear in docker inspect or the image.
+services:
+  backend:
+    environment:
+      # Read from your shell or the repository's .env. These hold no secrets.
+      LLM_ENABLED: ${LLM_ENABLED:-false}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-20}
+      LLM_MAX_RETRIES: ${LLM_MAX_RETRIES:-1}
+      LLM_MAX_REQUESTS_PER_MINUTE: ${LLM_MAX_REQUESTS_PER_MINUTE:-10}
+      LLM_MAX_REQUESTS_PER_DAY: ${LLM_MAX_REQUESTS_PER_DAY:-40}
+    secrets:
+      - openrouter_api_key
+
+secrets:
+  openrouter_api_key:
+    file: ${USERPROFILE:?USERPROFILE must be set}/.troubleshooting-agent-llm/openrouter_api_key

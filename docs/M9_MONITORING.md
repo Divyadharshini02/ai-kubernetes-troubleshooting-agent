@@ -115,7 +115,7 @@ HTTP series cannot do this, because their routes and statuses are only known onc
 
 ## The dashboard
 
-One dashboard, **Troubleshooting Agent**, with 12 panels. Metric names here leave out the prefix.
+One dashboard, **Troubleshooting Agent**, with 12 panels. Metric names here leave out the prefix. [Milestone 10](M10_AI_AGENT.md#monitoring) added two more, for AI analyses and chat, and left these unchanged.
 
 | Panel | PromQL |
 |---|---|

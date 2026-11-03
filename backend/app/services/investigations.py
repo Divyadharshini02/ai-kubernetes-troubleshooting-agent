@@ -8,7 +8,7 @@ import logging
 import time
 import uuid
 
-from app.agent.explainer import explain_report
+from app.agent.analysis import analyze_investigation
 from app.diagnostics.engine import diagnose
 from app.kubernetes.cluster import ClusterAccessError, read_cluster_health
 from app.models.diagnosis import DiagnosticReport
@@ -63,9 +63,10 @@ def _investigate(investigation_id: str, namespace: str, explain: bool) -> tuple[
     )
 
     if explain:
-        storage.add_event(investigation_id, "ai_requested", "An AI explanation was requested.")
-        report.llm = explain_report(report, bundle)
-        storage.add_event(investigation_id, "ai_finished", f"AI explanation status: {report.llm.status}.")
+        # One root cause analysis for the whole investigation. Per-diagnosis explanations remain on the diagnosis endpoint.
+        storage.add_event(investigation_id, "ai_requested", "An AI root cause analysis was requested.")
+        report.ai_analysis = analyze_investigation(report, bundle)
+        storage.add_event(investigation_id, "ai_finished", f"AI analysis status: {report.ai_analysis.status}.")
 
     report.evidence = bundle
     status = recovery_status(storage.previous_outcome(investigation_id, namespace), report)

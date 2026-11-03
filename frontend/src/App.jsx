@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import AiAnalysis from './components/AiAnalysis.jsx'
+import ChatPanel from './components/ChatPanel.jsx'
 import ClusterOverview from './components/ClusterOverview.jsx'
 import DiagnosisReport from './components/DiagnosisReport.jsx'
 import EvidenceViewer from './components/EvidenceViewer.jsx'
@@ -199,6 +201,10 @@ function App() {
             <ProgressList events={events} running={Boolean(followingId)} notice={notice} />
           )}
           {investigation && <DiagnosisReport investigation={investigation} />}
+          {investigation?.report?.ai_analysis && <AiAnalysis analysis={investigation.report.ai_analysis} />}
+          {investigation && investigation.status !== 'running' && (
+            <ChatPanel key={`chat-${investigation.id}`} investigationId={investigation.id} />
+          )}
           {investigation?.report?.evidence && (
             <EvidenceViewer key={investigation.id} evidence={investigation.report.evidence} />
           )}

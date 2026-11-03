@@ -40,6 +40,17 @@ CREATE TABLE IF NOT EXISTS progress_events (
     occurred_at TEXT NOT NULL,
     PRIMARY KEY (investigation_id, sequence)
 );
+CREATE TABLE IF NOT EXISTS chat_messages (
+    investigation_id TEXT NOT NULL REFERENCES investigations (id),
+    sequence INTEGER NOT NULL,
+    role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+    kind TEXT NOT NULL,
+    text TEXT NOT NULL,
+    answer_json TEXT,
+    reason TEXT,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (investigation_id, sequence)
+);
 """
 
 # Everything except the report, which can be large and is only needed for one investigation.
@@ -129,6 +140,8 @@ def previous_outcome(investigation_id: str, namespace: str) -> str | None:
 def complete_investigation(investigation_id: str, report: DiagnosticReport, verification_status: str) -> None:
     """Save the report and its final events together, so a reader never sees only some of them."""
     finished_at = utc_now()
+    # Reports from before Milestone 10 carry per-diagnosis explanations instead of an analysis.
+    ai = report.ai_analysis or report.llm
     with _connection() as connection:
         connection.execute(
             "UPDATE investigations SET status = 'completed', completed_at = ?, duration_seconds = ?, "
@@ -141,8 +154,8 @@ def complete_investigation(investigation_id: str, report: DiagnosticReport, veri
                 report.outcome,
                 report.summary,
                 len(report.diagnoses),
-                report.llm.status if report.llm else None,
-                report.llm.reason if report.llm else None,
+                ai.status if ai else None,
+                ai.reason if ai else None,
                 report.model_dump_json(),
                 investigation_id,
             ),

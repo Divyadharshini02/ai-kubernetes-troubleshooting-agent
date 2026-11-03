@@ -103,7 +103,18 @@ def test_every_alert_has_a_rule_test():
 
 def test_one_dashboard_with_the_agreed_panels(dashboard):
     assert list(DASHBOARD.parent.glob("*.json")) == [DASHBOARD]
-    assert len(dashboard["panels"]) == 12
+    # Twelve from Milestone 9, and two for the Milestone 10 analysis and chat.
+    assert len(dashboard["panels"]) == 14
+
+
+def test_the_ai_panels_show_analysis_and_chat_metrics(dashboard):
+    by_title = {panel["title"]: " ".join(t["expr"] for t in panel["targets"]) for panel in dashboard["panels"]}
+
+    assert "troubleshooting_ai_analyses_total" in by_title["AI root cause analyses"]
+    assert "troubleshooting_llm_request_duration_seconds_count" in by_title["AI root cause analyses"]
+    assert "troubleshooting_chat_messages_total" in by_title["AI chat messages"]
+    # The diagnosis endpoint's per-diagnosis explanations keep their Milestone 9 panel.
+    assert "troubleshooting_llm_explanations_total" in by_title["Collector failures and LLM status"]
     assert dashboard["uid"] == "troubleshooting-agent"
     assert dashboard["editable"] is False
 
@@ -242,6 +253,7 @@ def test_jenkins_validates_monitoring_and_keeps_every_earlier_gate():
         "Backend lint",
         "Backend tests",
         "Frontend lint",
+        "Frontend tests",
         "Frontend build",
         "Validate manifests",
         "Validate monitoring",

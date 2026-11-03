@@ -774,6 +774,135 @@
           "values": false
         }
       }
+    },
+    {
+      "id": 13,
+      "type": "stat",
+      "title": "AI root cause analyses",
+      "description": "One per investigation run with AI. Unavailable means the user saw only the deterministic diagnosis; the reason says why. Not needed means a healthy namespace, with no request. Requests sent counts only requests that reached the provider.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 36,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "round(sum by (status, reason) (increase(troubleshooting_ai_analyses_total[$__range]))) > 0",
+          "legendFormat": "{{status}} {{reason}}",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "round(sum(increase(troubleshooting_llm_request_duration_seconds_count[$__range]))) > 0",
+          "legendFormat": "LLM requests sent",
+          "refId": "B",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          },
+          "noValue": "None",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 14,
+      "type": "stat",
+      "title": "AI chat messages",
+      "description": "Chat messages by how they were answered. off_topic, clarify and policy were answered by the topic guard without the LLM. budget_exhausted were refused before sending.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 36,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "round(sum by (status) (increase(troubleshooting_chat_messages_total[$__range]))) > 0",
+          "legendFormat": "{{status}}",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "noValue": "None",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
     }
   ]
 }

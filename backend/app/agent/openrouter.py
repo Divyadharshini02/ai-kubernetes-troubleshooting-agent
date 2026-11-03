@@ -11,15 +11,20 @@ import urllib3
 from urllib3.exceptions import HTTPError, NewConnectionError
 from urllib3.exceptions import TimeoutError as Urllib3Timeout
 
+from app.agent.budget import BUDGET
 from app.agent.provider import ProviderError
-from app.core.config import Settings
+from app.core.config import Settings, is_free_model
 
 logger = logging.getLogger(__name__)
 
 CONNECT_TIMEOUT_SECONDS = 5
 MAX_RESPONSE_BYTES = 64 * 1024
-# Reasoning models can spend part of this budget before writing their answer.
-MAX_OUTPUT_TOKENS = 4000
+# Reasoning models spend part of this budget thinking before they write the answer. 4,000 was
+# found too small in real use: the root cause analysis was cut off before its JSON was complete.
+MAX_OUTPUT_TOKENS = 16000
+# Less thinking, and the thinking itself left out of the response, so it cannot use up the
+# response size limit. Providers that do not support this are not used, because of require_parameters.
+REASONING = {"effort": "low", "exclude": True}
 _CHUNK_BYTES = 8192
 
 
@@ -43,26 +48,42 @@ class OpenRouterProvider:
     name = "openrouter"
 
     def __init__(self, settings: Settings):
+        # Checked here too, so no caller can reach a paid model by skipping a configuration check.
+        if not is_free_model(settings.openrouter_model):
+            raise ProviderError("model_not_free", stop_all=True)
         self.model = settings.openrouter_model
         self._url = f"{settings.openrouter_base_url}/chat/completions"
         self._api_key = settings.openrouter_api_key.get_secret_value()
         self._timeout = settings.llm_timeout_seconds
+        self._per_minute = settings.llm_max_requests_per_minute
+        self._per_day = settings.llm_max_requests_per_day
         self._http = urllib3.PoolManager(cert_reqs="CERT_REQUIRED", ca_certs=certifi.where(), retries=False)
 
-    def complete(self, system: str, user: str, schema: dict, deadline: float) -> str:
+    def complete(self, system: str, user: str, schema: dict, deadline: float, schema_name: str = "diagnosis_explanation") -> str:
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             raise ProviderError("time_budget_exhausted", stop_all=True)
+        if not BUDGET.try_acquire(self._per_minute, self._per_day):
+            logger.warning("Local LLM request limit reached, so no request was sent")
+            raise ProviderError("budget_exhausted", stop_all=True)
         timeout = min(self._timeout, remaining)
         body = {
+            # One model only. A list of models would let OpenRouter fall back to another, possibly paid, one.
             "model": self.model,
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
             "response_format": {
                 "type": "json_schema",
-                "json_schema": {"name": "diagnosis_explanation", "strict": True, "schema": schema},
+                "json_schema": {"name": schema_name, "strict": True, "schema": schema},
             },
-            # Only route to providers that support the schema above.
-            "provider": {"require_parameters": True},
+            "provider": {
+                # Only route to providers that support the schema above.
+                "require_parameters": True,
+                # Refuse any provider that would charge, in dollars per million tokens.
+                "max_price": {"prompt": 0, "completion": 0},
+            },
+            # Asks OpenRouter to report the cost, so a charge would be detected rather than assumed away.
+            "usage": {"include": True},
+            "reasoning": REASONING,
             "temperature": 0,
             "max_tokens": MAX_OUTPUT_TOKENS,
             "stream": False,
@@ -194,7 +215,24 @@ def _extract_content(raw: bytes) -> str:
         raise ProviderError("empty_response", retryable=True)
     if not isinstance(content, str):
         raise ProviderError("malformed_response")
+    _require_free_response(payload)
     return content
+
+
+def _require_free_response(payload: dict) -> None:
+    """Use an answer only if the provider says it came from a free model, at no cost.
+
+    The request already asks for this. Checking the response as well means a paid answer is
+    never used, even if routing ever behaved differently. A missing model is not trusted either.
+    """
+    model = payload.get("model")
+    usage = payload.get("usage")
+    cost = usage.get("cost") if isinstance(usage, dict) else None
+    charged = isinstance(cost, (int, float)) and not isinstance(cost, bool) and cost > 0
+    if not isinstance(model, str) or not is_free_model(model) or charged:
+        # No model name or amount: the response is untrusted, and this only needs to say what was refused.
+        logger.warning("LLM response rejected: not confirmed as a free model at zero cost")
+        raise ProviderError("non_free_model", stop_all=True)
 
 
 def _raise_for_embedded_error(error) -> None:

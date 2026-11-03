@@ -73,11 +73,59 @@ def valid_content(**overrides):
     return content
 
 
-def completion(content, finish_reason="stop", **message_fields):
-    """An OpenRouter chat completion whose message content is the given value."""
+def valid_rca(evidence_ids, **overrides):
+    """A root cause analysis that passes every check for the stub crash-loop cluster, citing real evidence."""
+    first = evidence_ids[0]
+    content = {
+        "summary": "A container in this namespace keeps restarting.",
+        "root_cause": {
+            "statement": "The container process exits soon after it starts, so Kubernetes keeps restarting it.",
+            "kind": "hypothesis",
+            "evidence_ids": [first],
+        },
+        "reasoning": ["The container is waiting to be restarted after repeated exits."],
+        "supporting_evidence": [{"evidence_id": first, "observation": "The container is not ready and has restarted."}],
+        "confidence": "medium",
+        "limitations": ["The evidence does not show why the process exits."],
+        "alternative_causes": [],
+        "remediation": [
+            {
+                "action": "Read the logs of the previous container run.",
+                "why": "They may show why the process exits.",
+                "risk": "low",
+                "commands": [],
+                "evidence_ids": [first],
+            }
+        ],
+        "verification_steps": ["Run a new investigation after the fix."],
+    }
+    content.update(overrides)
+    return content
+
+
+def valid_chat(cite=(), **overrides):
+    """A chat answer that passes every check for the stub crash-loop cluster, citing the first of cite."""
+    content = {
+        "answer": "The container keeps restarting because its process exits soon after it starts.",
+        "scope": "investigation",
+        "evidence_ids": list(cite)[:1],
+        "remediation": [],
+        "limitations": ["The evidence does not show why the process exits."],
+        "follow_up_questions": ["What do the previous logs show?"],
+    }
+    content.update(overrides)
+    return content
+
+
+FREE_TEST_MODEL = "test/model:free"
+
+
+def completion(content, finish_reason="stop", model=FREE_TEST_MODEL, **message_fields):
+    """An OpenRouter chat completion whose message content is the given value, from a free model."""
     text = content if isinstance(content, str) or content is None else json.dumps(content)
     return {
         "id": "gen-test",
+        "model": model,
         "choices": [
             {
                 "finish_reason": finish_reason,

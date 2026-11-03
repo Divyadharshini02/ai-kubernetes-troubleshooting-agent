@@ -5,7 +5,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 
 from app import __version__
-from app.api import cluster, diagnosis, evidence, health, investigations
+from app.api import chat, cluster, diagnosis, evidence, health, investigations
 from app.kubernetes.cluster import ALLOW_DEFAULT_KUBECONFIG, default_kubeconfig_allowed
 from app.observability import metrics
 from app.observability.middleware import METRICS_PATH, MetricsMiddleware
@@ -35,6 +35,7 @@ app.include_router(cluster.router, prefix="/api")
 app.include_router(evidence.router, prefix="/api")
 app.include_router(diagnosis.router, prefix="/api")
 app.include_router(investigations.router, prefix="/api")
+app.include_router(chat.router, prefix="/api")
 
 
 # Outside /api on purpose: nginx proxies only /api/, so this is not reachable through the frontend.

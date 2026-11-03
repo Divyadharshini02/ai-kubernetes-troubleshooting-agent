@@ -11,7 +11,7 @@ from app.agent.openrouter import OpenRouterProvider
 from app.agent.prompt import OUTPUT_SCHEMA, SYSTEM_PROMPT, build_user_message
 from app.agent.provider import LlmProvider, ProviderError
 from app.agent.validation import find_unsupported_claims, parse_explanation
-from app.core.config import Settings, load_settings
+from app.core.config import Settings, is_free_model, load_settings
 from app.models.diagnosis import Diagnosis, DiagnosticReport
 from app.models.evidence import EvidenceBundle
 from app.models.explanation import DiagnosisExplanation, LlmReport
@@ -48,6 +48,9 @@ REASON_MESSAGES = {
     "limit_reached": "This diagnosis was not explained, because of the limit per request.",
     "time_budget_exhausted": "This diagnosis was not explained, because the time limit was reached.",
     "unexpected_error": "The explanation failed unexpectedly.",
+    "model_not_free": "The configured model is not a free model, so no request was sent. Use a model ID ending in :free.",
+    "non_free_model": "The response was not confirmed as coming from a free model at no cost, so it was not used.",
+    "budget_exhausted": "The local limit on LLM requests was reached. Try again later.",
 }
 
 
@@ -61,7 +64,8 @@ def _unavailable(diagnosis: Diagnosis, reason: str) -> DiagnosisExplanation:
     )
 
 
-def _configuration_problem(settings: Settings | None) -> str | None:
+def configuration_problem(settings: Settings | None) -> str | None:
+    """The reason no request can be made with these settings, or None if one can."""
     if settings is None:
         return "invalid_configuration"
     if not settings.llm_enabled:
@@ -70,14 +74,20 @@ def _configuration_problem(settings: Settings | None) -> str | None:
         return "missing_api_key"
     if not settings.openrouter_model.strip():
         return "missing_model"
+    if not is_free_model(settings.openrouter_model):
+        return "model_not_free"
     return None
 
 
-def _timed_complete(provider: LlmProvider, user_message: str, deadline: float) -> str:
+# Refused by the application before anything was sent, so they are not provider requests.
+LOCAL_REFUSALS = {"budget_exhausted", "time_budget_exhausted"}
+
+
+def _timed_complete(provider: LlmProvider, user_message: str, deadline: float, system: str, schema: dict, schema_name: str) -> str:
     started = time.monotonic()
     error_reason = None
     try:
-        return provider.complete(SYSTEM_PROMPT, user_message, OUTPUT_SCHEMA, deadline)
+        return provider.complete(system, user_message, schema, deadline, schema_name)
     except ProviderError as exc:
         error_reason = exc.code
         raise
@@ -85,14 +95,24 @@ def _timed_complete(provider: LlmProvider, user_message: str, deadline: float) -
         error_reason = "unexpected_error"
         raise
     finally:
-        record_llm_request(time.monotonic() - started, error_reason)
+        if error_reason not in LOCAL_REFUSALS:
+            record_llm_request(time.monotonic() - started, error_reason)
 
 
-def _complete_with_retries(provider: LlmProvider, user_message: str, max_retries: int, deadline: float) -> str:
+def complete_with_retries(
+    provider: LlmProvider,
+    user_message: str,
+    max_retries: int,
+    deadline: float,
+    system: str = SYSTEM_PROMPT,
+    schema: dict = OUTPUT_SCHEMA,
+    schema_name: str = "diagnosis_explanation",
+) -> str:
+    """Request a completion, retrying only temporary failures. Every attempt is measured."""
     attempt = 0
     while True:
         try:
-            return _timed_complete(provider, user_message, deadline)
+            return _timed_complete(provider, user_message, deadline, system, schema, schema_name)
         except ProviderError as exc:
             if not exc.retryable or attempt >= max_retries or time.monotonic() + RETRY_DELAY_SECONDS >= deadline:
                 raise
@@ -104,7 +124,7 @@ def _explain_one(
     provider: LlmProvider, diagnosis: Diagnosis, bundle: EvidenceBundle, max_retries: int, deadline: float
 ) -> DiagnosisExplanation:
     user_message = build_user_message(diagnosis, bundle)
-    raw = _complete_with_retries(provider, user_message, max_retries, deadline)
+    raw = complete_with_retries(provider, user_message, max_retries, deadline)
     content = parse_explanation(raw)
     failed_checks = find_unsupported_claims(content, user_message, diagnosis)
     if failed_checks:
@@ -173,7 +193,7 @@ def _explain_safely(report: DiagnosticReport, bundle: EvidenceBundle) -> LlmRepo
 
 def _build_report(report: DiagnosticReport, bundle: EvidenceBundle) -> LlmReport:
     settings = load_settings()
-    problem = _configuration_problem(settings)
+    problem = configuration_problem(settings)
     model = settings.openrouter_model or None if settings else None
     if problem:
         return LlmReport(

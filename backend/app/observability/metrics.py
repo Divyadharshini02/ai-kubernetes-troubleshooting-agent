@@ -120,6 +120,17 @@ LLM_EXPLANATIONS = Counter(
     "Requests for LLM explanations. Unavailable means the user received only the deterministic result.",
     ["status", "reason"],
 )
+CHAT_STATUSES = ("answered", "unavailable", "off_topic", "clarify", "policy", "budget_exhausted")
+CHAT_MESSAGES = Counter(
+    f"{PREFIX}_chat_messages",
+    "Chat messages handled. off_topic, clarify and policy were answered by the topic guard, without the LLM.",
+    ["status"],
+)
+AI_ANALYSES = Counter(
+    f"{PREFIX}_ai_analyses",
+    "AI root cause analyses of investigations. Unavailable means the user received only the deterministic result.",
+    ["status", "reason"],
+)
 
 
 def _initialize_series() -> None:
@@ -145,6 +156,12 @@ def _initialize_series() -> None:
         LLM_EXPLANATIONS.labels("partial", reason)
     LLM_EXPLANATIONS.labels("generated", NONE)
     LLM_EXPLANATIONS.labels("not_needed", NONE)
+    for reason in LLM_REASONS:
+        AI_ANALYSES.labels("unavailable", reason)
+    AI_ANALYSES.labels("generated", NONE)
+    AI_ANALYSES.labels("not_needed", NONE)
+    for status in CHAT_STATUSES:
+        CHAT_MESSAGES.labels(status)
 
 
 _initialize_series()
@@ -206,6 +223,16 @@ def record_llm_request(seconds: float, error_reason: str | None) -> None:
 @_safely
 def record_llm_explanation(status: str, reason: str | None) -> None:
     LLM_EXPLANATIONS.labels(status, _bounded(reason, LLM_REASONS, NONE)).inc()
+
+
+@_safely
+def record_chat_message(status: str) -> None:
+    CHAT_MESSAGES.labels(_bounded(status, CHAT_STATUSES)).inc()
+
+
+@_safely
+def record_ai_analysis(status: str, reason: str | None) -> None:
+    AI_ANALYSES.labels(_bounded(status, ("generated", "unavailable", "not_needed")), _bounded(reason, LLM_REASONS, NONE)).inc()
 
 
 def render() -> tuple[bytes, str]:

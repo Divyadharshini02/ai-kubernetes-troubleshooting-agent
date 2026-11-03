@@ -76,6 +76,14 @@ pipeline {
             }
         }
 
+        stage('Frontend tests') {
+            options { timeout(time: 10, unit: 'MINUTES') }
+            steps {
+                // Components run in a simulated browser against fixed test data. Nothing reaches a backend or an LLM.
+                inNode('npm test')
+            }
+        }
+
         stage('Frontend build') {
             options { timeout(time: 5, unit: 'MINUTES') }
             steps {
@@ -116,9 +124,11 @@ pipeline {
         stage('Build images') {
             options { timeout(time: 15, unit: 'MINUTES') }
             steps {
+                // --pull and --no-cache rebuild every layer, so package upgrades are fetched fresh each time.
+                // A cached "apk upgrade" layer once kept a vulnerable libexpat after its fix was published.
                 sh '''
-                    docker build --label "commit=$IMAGE_TAG" -t "$BACKEND_IMAGE:$IMAGE_TAG" backend
-                    docker build --label "commit=$IMAGE_TAG" -t "$FRONTEND_IMAGE:$IMAGE_TAG" frontend
+                    docker build --pull --no-cache --label "commit=$IMAGE_TAG" -t "$BACKEND_IMAGE:$IMAGE_TAG" backend
+                    docker build --pull --no-cache --label "commit=$IMAGE_TAG" -t "$FRONTEND_IMAGE:$IMAGE_TAG" frontend
                     docker images --filter label=project=troubleshooting-agent | tee reports/images.txt
                 '''
             }

@@ -19,7 +19,7 @@ class LlmProvider(Protocol):
     name: str
     model: str
 
-    def complete(self, system: str, user: str, schema: dict, deadline: float) -> str:
+    def complete(self, system: str, user: str, schema: dict, deadline: float, schema_name: str = "diagnosis_explanation") -> str:
         """Return the model's raw text. Raises ProviderError on any failure.
 
         There is deliberately no way to offer the model tools or functions.

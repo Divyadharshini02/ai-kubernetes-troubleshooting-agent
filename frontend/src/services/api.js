@@ -24,10 +24,28 @@ async function errorMessage(response) {
   }
 }
 
+/** An error from the backend, keeping its HTTP status and code so callers can explain it. */
+export class ApiError extends Error {
+  constructor(message, status, code) {
+    super(message)
+    this.status = status
+    this.code = code
+  }
+}
+
+async function errorCode(response) {
+  try {
+    return (await response.clone().json())?.detail?.code
+  } catch {
+    return undefined
+  }
+}
+
 async function request(path, options) {
   const response = await fetch(path, options)
   if (!response.ok) {
-    throw new Error(await errorMessage(response))
+    const code = await errorCode(response)
+    throw new ApiError(await errorMessage(response), response.status, code)
   }
   return response.json()
 }
@@ -50,6 +68,22 @@ export function fetchInvestigations() {
 
 export function fetchInvestigation(id) {
   return request(`${INVESTIGATIONS}/${encodeURIComponent(id)}`)
+}
+
+// The same limit as the backend, which also enforces it.
+export const MAX_CHAT_MESSAGE_CHARS = 2000
+
+export function fetchChat(id) {
+  return request(`${INVESTIGATIONS}/${encodeURIComponent(id)}/chat`)
+}
+
+/** Ask about a saved investigation. The backend uses saved evidence, so nothing is collected again. */
+export function sendChatMessage(id, message) {
+  return request(`${INVESTIGATIONS}/${encodeURIComponent(id)}/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message }),
+  })
 }
 
 /**

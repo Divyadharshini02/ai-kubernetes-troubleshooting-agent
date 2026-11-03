@@ -8,7 +8,8 @@ from app.models.diagnosis import DiagnosticReport
 router = APIRouter(tags=["diagnosis"])
 
 
-@router.get("/namespaces/{namespace}/diagnosis", response_model=DiagnosticReport)
+# The investigation-level analysis belongs to investigations, so this response keeps its earlier shape.
+@router.get("/namespaces/{namespace}/diagnosis", response_model=DiagnosticReport, response_model_exclude={"ai_analysis"})
 def get_namespace_diagnosis(
     namespace: NamespaceName,
     include_evidence: bool = False,

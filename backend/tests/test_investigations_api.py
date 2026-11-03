@@ -17,7 +17,7 @@ from app.main import app
 from app.services import investigations as service
 from app.storage import investigations as storage
 from conftest import TEST_API_KEY
-from llm_factory import COMPLETIONS_PATH, completion, valid_content
+from llm_factory import COMPLETIONS_PATH, completion, valid_content, valid_rca
 from stub_kube import NAMESPACE, SECRET_VALUE, container_status, list_of, make_pod, namespace_routes, pod_log_path
 from test_cluster_health import VERSION
 
@@ -315,14 +315,18 @@ def test_llm_failure_keeps_the_deterministic_diagnosis(cluster, llm, monkeypatch
     ]
 
 
-def test_llm_explanation_is_saved_apart_from_an_identical_diagnosis(cluster, llm):
+def test_ai_analysis_is_saved_apart_from_an_identical_diagnosis(cluster, llm):
     without = investigate()
-    llm.routes[COMPLETIONS_PATH] = (200, completion(valid_content()))
+    cited = [reference["evidence_id"] for reference in without["report"]["diagnoses"][0]["evidence_references"]]
+    llm.routes[COMPLETIONS_PATH] = (200, completion(valid_rca(cited)))
 
     explained = investigate(explain=True)
 
     assert explained["ai_status"] == "generated"
-    assert explained["report"]["llm"]["used"] is True
+    assert explained["report"]["ai_analysis"]["status"] == "generated"
+    # One analysis per investigation replaces the per-diagnosis explanations.
+    assert explained["report"]["llm"] is None
+    assert len(llm.requests) == 1
     assert [d["title"] for d in explained["report"]["diagnoses"]] == [d["title"] for d in without["report"]["diagnoses"]]
 
 
